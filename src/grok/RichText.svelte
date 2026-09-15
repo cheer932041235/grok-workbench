@@ -1,8 +1,18 @@
 <script lang="ts">
+  import { getContext } from "svelte";
+  import { filePreviewContext, parseFileLink, type OpenFile } from "./file-links";
   import { renderMarkdown } from "$lib/utils/markdown";
-  let { text }: { text: string } = $props();
+  let { text, base }: { text: string; base?: string } = $props();
+  const openFile = getContext<OpenFile | undefined>(filePreviewContext);
   let copied = $state("");
   async function copy(event: MouseEvent) {
+    const link = (event.target as HTMLElement).closest<HTMLElement>("[data-local-file]");
+    if (link) {
+      event.preventDefault();
+      const target = parseFileLink(link.dataset.localFile ?? "");
+      if (target && openFile) openFile(target, base);
+      return;
+    }
     const target = (event.target as HTMLElement).closest<HTMLButtonElement>(
       "[data-code-copy], [data-math-copy]",
     );

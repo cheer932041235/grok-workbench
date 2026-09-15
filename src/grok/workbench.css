@@ -1379,3 +1379,36 @@ header {
   margin: 8px 0;
   text-align: left;
 }
+
+/* Reserve room for the preview so the composer and send button stay reachable. */
+.workbench.preview-open {
+  width: calc(100% - var(--preview-width));
+  grid-template-columns: var(--left-width) 6px minmax(0, 1fr);
+}
+.preview-open > .inspector,
+.preview-open > .right-resize {
+  display: none;
+}
+.workbench.preview-open.focus-mode {
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (max-width: 1300px) {
+  .workbench.preview-open {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .preview-open > .sidebar,
+  .preview-open > .panel-resize {
+    display: none;
+  }
+}
+
+.file-link {
+  color: #b7d4ed;
+  background: transparent;
+  border: 0;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+  text-align: left;
+}

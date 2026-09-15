@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { getContext } from "svelte";
+  import { filePreviewContext, type OpenFile } from "./file-links";
+  const openFile = getContext<OpenFile | undefined>(filePreviewContext);
   import { diffLines } from "diff";
   import { toolText, toolStatus, type Tool } from "./protocol";
   let { tool }: { tool: Tool } = $props();
@@ -24,8 +27,10 @@
   </summary>
   {#if expanded}<div class="tool-body">
       {#if tool.locations?.length}<div class="tool-paths">
-          {#each tool.locations as location}<code
-              >{location.path}{location.line ? `:${location.line}` : ""}</code
+          {#each tool.locations as location}<button
+              class="file-link"
+              onclick={() => openFile?.({ path: location.path, line: location.line })}
+              >{location.path}{location.line ? `:${location.line}` : ""}</button
             >{/each}
         </div>{/if}
       {#if tool.rawInput}<details class="raw">
@@ -35,7 +40,12 @@
       {#if output}<pre class="tool-output">{output}</pre>{/if}
       {#each diffs as change}
         <div class="diff">
-          <div class="diff-path">{change.path || "文件修改"}</div>
+          <div class="diff-path">
+            {#if change.path}<button
+                class="file-link"
+                onclick={() => openFile?.({ path: change.path! })}>{change.path}</button
+              >{:else}文件修改{/if}
+          </div>
           {#each diffLines(change.oldText ?? "", change.newText ?? "") as part}<pre
               class:added={part.added}
               class:removed={part.removed}>{part.added

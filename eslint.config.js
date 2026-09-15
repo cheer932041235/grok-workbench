@@ -61,7 +61,13 @@ export default ts.config(
   // Allow @tauri-apps/api in the transport layer (the only place it belongs)
   {
     // Grok Workbench is a native ACP client; its entry point uses Tauri IPC directly.
-    files: ["src/lib/transport/**", "src/grok/client.ts", "src/grok/TitleBar.svelte", "src/routes/+page.svelte"],
+    files: [
+      "src/lib/transport/**",
+      "src/grok/client.ts",
+      "src/grok/TitleBar.svelte",
+      "src/grok/FilePreview.svelte",
+      "src/routes/+page.svelte",
+    ],
     rules: {
       "no-restricted-imports": "off",
     },

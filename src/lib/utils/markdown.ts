@@ -4,6 +4,7 @@ import { perfMark } from "$lib/utils/perf";
 import { hljs } from "$lib/utils/hljs-init";
 import DOMPurify from "dompurify";
 import { mathExtensions } from "../../grok/math";
+import { parseFileLink } from "../../grok/file-links";
 import "katex/dist/katex.min.css";
 import "highlight.js/styles/github-dark.min.css";
 
@@ -14,6 +15,13 @@ marked.use({
   gfm: true,
   breaks: false,
   renderer: {
+    link({ href, tokens }) {
+      const label = this.parser.parseInline(tokens);
+      if (parseFileLink(href)) {
+        return `<a href="#" data-local-file="${escapeHtml(href)}" title="预览文件">${label}</a>`;
+      }
+      return `<a href="${escapeHtml(href)}">${label}</a>`;
+    },
     // marked v15: table(token) receives a Token with header[] and rows[][]
     table(token: {
       header: Array<{ tokens: Token[]; align: string | null; header: boolean }>;

@@ -5,12 +5,14 @@
     min,
     max,
     onresize,
+    label,
   }: {
     side: "left" | "right";
     width: number;
     min: number;
     max: number;
     onresize: (width: number, save: boolean) => void;
+    label?: string;
   } = $props();
   let dragging = $state(false);
   let startX = 0;
@@ -57,7 +59,7 @@
   role="separator"
   tabindex="0"
   aria-orientation="vertical"
-  aria-label={side === "left" ? "调整会话侧栏宽度" : "调整任务概览宽度"}
+  aria-label={label ?? (side === "left" ? "调整会话侧栏宽度" : "调整任务概览宽度")}
   aria-valuenow={width}
   aria-valuemin={min}
   aria-valuemax={max}

@@ -1,3 +1,4 @@
+mod files;
 mod grok;
 mod history;
 use tauri::Manager;
@@ -35,6 +36,8 @@ pub fn run() {
             grok::grok_save_draft,
             grok::grok_load_draft,
             grok::grok_export,
+            files::grok_preview_file,
+            files::grok_open_file,
             grok_quit
         ])
         .run(tauri::generate_context!())

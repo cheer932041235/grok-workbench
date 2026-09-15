@@ -1,5 +1,12 @@
 <script lang="ts">
-  import { onMount, tick } from "svelte";
+  import { onMount, tick, setContext } from "svelte";
+  import FilePreview from "../grok/FilePreview.svelte";
+  import { filePreviewContext, type FileTarget, type OpenFile } from "../grok/file-links";
+  let previewWidth = $state(480);
+  let preview = $state<{ target: FileTarget; cwd: string }>();
+  setContext<OpenFile>(filePreviewContext, (target, base) => {
+    preview = { target, cwd: base ?? cwd };
+  });
   import { invoke, isTauri } from "@tauri-apps/api/core";
   import { open, save } from "@tauri-apps/plugin-dialog";
   import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -887,6 +894,8 @@
 <div
   class="workbench"
   class:focus-mode={focusMode}
+  class:preview-open={Boolean(preview)}
+  style:--preview-width={`${Math.min(previewWidth, windowWidth - (windowWidth > 1300 ? 960 : 460))}px`}
   style={`--reading-size:${fontSize}px;--reading-line-height:${lineHeight};--left-width:${displayedLeft}px;--right-width:${displayedRight}px`}
 >
   <aside class="sidebar">
@@ -1390,6 +1399,12 @@
     max={rightMax}
     onresize={(value, save) => resizePanel("right", value, save)}
   />
+  {#if preview}<FilePreview
+      bind:width={previewWidth}
+      target={preview.target}
+      cwd={preview.cwd}
+      onclose={() => (preview = undefined)}
+    />{/if}
   <aside class="inspector">
     <div class="inspector-heading">任务概览 <span>◉</span></div>
     <div class="overview-state">
