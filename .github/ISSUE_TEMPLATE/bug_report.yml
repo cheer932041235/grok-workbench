@@ -1,0 +1,30 @@
+name: 问题反馈
+description: 报告可复现的功能或显示问题
+title: "[Bug] "
+labels: [bug]
+body:
+  - type: textarea
+    id: environment
+    attributes:
+      label: 运行环境
+      description: 应用版本、Grok CLI 版本、操作系统；显示问题补充缩放比例。
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 从哪个页面开始，依次执行了什么？
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: 预期与实际结果
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 截图、错误信息或最小示例
+      description: 显示问题可贴触发问题的 Markdown。请移除个人信息，不要上传凭据或完整私人会话。
