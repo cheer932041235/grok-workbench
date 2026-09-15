@@ -2,7 +2,15 @@
 
 为 Grok Build 设计的桌面工作台，让回答、公式、工具执行和历史对话更容易阅读与管理。
 
-**当前版本：0.1.0，早期预览。** 已在 Windows 上联调 Grok Build 1.0.25。本仓库提供源码；Grok CLI 需要单独安装并登录。
+**当前版本：0.1.0，早期预览。** 已在 Windows 上联调 Grok Build 1.0.25。Grok CLI 需要单独安装并登录。
+
+## 下载与安装
+
+[下载 Windows x64 安装包](https://github.com/cheer932041235/grok-workbench/releases/download/v0.1.0/GrokWorkbench_0.1.0_x64-setup.exe) · [查看发布说明](https://github.com/cheer932041235/grok-workbench/releases/tag/v0.1.0)
+
+运行安装包后，从开始菜单打开 Grok Workbench。系统缺少 WebView2 时安装程序需要联网获取运行时。使用前请按 [Grok Build 官方说明](https://github.com/xai-org/grok-build#installing-the-released-binary) 单独安装 CLI，并先在终端运行 `grok` 完成登录。
+
+安装版不需要安装 Node.js 或 Rust。macOS 和 Linux 暂未提供安装包。
 
 ## 日常使用
 
