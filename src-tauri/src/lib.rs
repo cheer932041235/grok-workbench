@@ -34,6 +34,7 @@ pub fn run() {
             grok::grok_load,
             grok::grok_import_history,
             grok::grok_save_draft,
+            grok::grok_save_session_draft,
             grok::grok_load_draft,
             grok::grok_export,
             files::grok_preview_file,

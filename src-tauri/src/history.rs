@@ -63,6 +63,13 @@ pub fn save(dir: &Path, record: &Value) -> Result<(), String> {
     save_summary(dir, record)
 }
 
+/// Typing sends only draft text over IPC; transcript parsing/writing runs off the UI thread.
+pub fn save_session_draft(dir: &Path, id: &str, text: &str) -> Result<(), String> {
+    let mut record = load_record(dir, id)?;
+    record["draft"] = json!(text);
+    save(dir, &record)
+}
+
 pub fn write_json(path: &Path, record: &Value) -> Result<(), String> {
     let data = serde_json::to_vec_pretty(record).map_err(|e| e.to_string())?;
     let pending = path.with_extension("json.tmp");
@@ -173,6 +180,22 @@ mod tests {
 
     fn record() -> Value {
         json!({"sessionId":"session-1","title":"First","cwd":"project","updatedAt":"2026-09-16T00:00:00Z","blocks":[{"type":"user","text":"hello","images":[{"data":"aGVsbG8=","mimeType":"image/png","name":"demo.png"}]}],"plan":[]})
+    }
+
+    #[test]
+    fn typing_preserves_transcript_archive_images_and_timestamp() {
+        let dir = test_dir();
+        let mut original = record();
+        original["archived"] = json!(true);
+        original["draftImages"] = json!([{"name":"draft.png","data":"example"}]);
+        save(&dir, &original).unwrap();
+        save_session_draft(&dir, "session-1", "中文输入草稿").unwrap();
+        let mut expected = original;
+        expected["draft"] = json!("中文输入草稿");
+        assert_eq!(load_record(&dir, "session-1").unwrap(), expected);
+        save_session_draft(&dir, "session-1", "").unwrap();
+        assert_eq!(load_record(&dir, "session-1").unwrap()["draft"], "");
+        clean_test_dir(&dir);
     }
 
     #[test]

@@ -11,11 +11,12 @@ export class SessionSaver {
   remember(record?: SessionRecord) {
     this.saved = record ? JSON.parse(JSON.stringify(record)) : undefined;
   }
-  save(record: SessionRecord): Promise<void> {
+  save(record: SessionRecord, before: Promise<void> = Promise.resolve()): Promise<void> {
     const snapshot: SessionRecord = JSON.parse(JSON.stringify(record));
     this.tail = this.tail
       .catch(() => {})
       .then(async () => {
+        await before.catch(() => {});
         if (sameSessionContent(snapshot, this.saved)) return;
         await this.write(snapshot);
         this.saved = snapshot;

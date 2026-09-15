@@ -170,6 +170,8 @@
   let client: GrokClient;
   let saveTimer: ReturnType<typeof setTimeout> | undefined;
   let saveQueue = Promise.resolve();
+  let draftTimer: ReturnType<typeof setTimeout> | undefined;
+  let lastInputAt = 0;
   let canLoad = false;
   let connection: Promise<void> | undefined;
   let visibleBlocks = $derived(
@@ -215,6 +217,8 @@
   }
   function persist() {
     if (!mounted) return Promise.resolve();
+    clearTimeout(draftTimer);
+    draftTimer = undefined;
     localStorage.setItem("grok-workbench.activeSession", sessionId);
     if (!sessionId) {
       localStorage.setItem("grok-workbench.newDraft", prompt);
@@ -222,8 +226,36 @@
       saveQueue = saveQueue.catch(() => {}).then(() => invoke<void>("grok_save_draft", { draft }));
       return saveQueue;
     }
-    const snapshot = JSON.parse(JSON.stringify(record())) as StoredSession;
-    return saveQueue.then(() => sessionSaver.save(snapshot));
+    saveQueue = sessionSaver.save(record(), saveQueue);
+    return saveQueue;
+  }
+  function inputChanged() {
+    lastInputAt = performance.now();
+    clearTimeout(draftTimer);
+    draftTimer = setTimeout(() => {
+      draftTimer = undefined;
+      if (!sessionId) {
+        void persist().catch(report);
+        return;
+      }
+      const id = sessionId;
+      const text = prompt;
+      saveQueue = saveQueue
+        .catch(() => {})
+        .then(async () => {
+          await invoke("grok_save_session_draft", { sessionId: id, text });
+          sessionSaver.remember();
+        });
+      void saveQueue.catch(report);
+    }, 600);
+  }
+  function saveWhenIdle() {
+    if (performance.now() - lastInputAt < 1000) {
+      saveTimer = setTimeout(saveWhenIdle, 1000);
+      return;
+    }
+    saveTimer = undefined;
+    void persist().catch(report);
   }
   const sessionSaver = new SessionSaver(
     async (snapshot) => {
@@ -311,11 +343,7 @@
     }
   }
   function changed() {
-    if (!saveTimer)
-      saveTimer = setTimeout(() => {
-        saveTimer = undefined;
-        void persist().catch(report);
-      }, 800);
+    if (!saveTimer) saveTimer = setTimeout(saveWhenIdle, 800);
     if (follow)
       void tick().then(() => {
         if (follow) viewport?.scrollTo({ top: viewport.scrollHeight });
@@ -876,6 +904,7 @@
     return () => {
       disposed = true;
       clearTimeout(saveTimer);
+      clearTimeout(draftTimer);
       unlistenClose?.();
       client.dispose();
     };
@@ -1315,13 +1344,7 @@
           onpaste={pasteImages}
           aria-label="给 Grok 的任务"
           bind:value={prompt}
-          oninput={() => {
-            if (!saveTimer)
-              saveTimer = setTimeout(() => {
-                saveTimer = undefined;
-                void persist().catch(report);
-              }, 800);
-          }}
+          oninput={inputChanged}
           onkeydown={keydown}
           placeholder={busy ? "继续输入下一条需求，按 Enter 加入队列…" : "告诉 Grok 你想做什么…"}
           rows="3"
