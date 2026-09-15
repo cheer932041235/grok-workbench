@@ -31,6 +31,8 @@ flowchart LR
 | `src/routes/+page.svelte` | 会话状态、设置、历史管理与组件协调 |
 | `src/grok/client.ts` | JSON-RPC 请求响应、事件监听与连接代次 |
 | `src/grok/protocol.ts` | 会话数据类型、更新合并、工具文本 |
+| `src/grok/session-events.ts` | 按会话 ID 分流主任务、子任务和扩展通知 |
+| `src/grok/SubagentCard.svelte` | 子任务状态、工具、思考和结果显示 |
 | `src/grok/queue.ts` | 串行执行、编辑、暂停和恢复 |
 | `src/grok/interactions.ts` | 提问与计划响应数据 |
 | `src/grok/images.ts` | 图片读取、预览地址与协议内容 |
@@ -38,7 +40,8 @@ flowchart LR
 | `src/grok/*Card.svelte` | 工具与用户交互卡片 |
 | `src/grok/RichText.svelte` | 富文本和复制交互 |
 | `src/grok/TitleBar.svelte`、`PanelResize.svelte` | 窗口操作与侧栏宽度 |
-| `src-tauri/src/grok.rs` | CLI 生命周期、消息桥接、历史读写 |
+| `src-tauri/src/grok.rs` | CLI 生命周期、消息桥接、命令入口 |
+| `src-tauri/src/history.rs` | 历史读取、损坏记录提示与文件保存 |
 
 ## 历史与恢复
 
@@ -48,6 +51,16 @@ flowchart LR
 
 ## 当前需要改进的结构
 
-页面协调逻辑仍较集中；历史接口一次读取全文；保存直接写入文件，单个文件解析错误可能影响列表。后续优先围绕这些实际问题拆分职责、改善读取和保存，而不是同时重写全部模块。
+历史保存先写入同目录临时文件，再替换正式文件，避免直接截断原记录。无法读取、解析或缺少必要顶层字段的记录会被跳过，并在界面提示路径；原文件保留。
+
+页面协调逻辑仍较集中；历史列表只读取摘要，打开会话时才读取正文。单个超长会话的渲染仍需进一步优化。
+
+侧栏可导入 Grok CLI/TUI 的既有会话。导入从 GROK_HOME 或默认用户目录读取 summary.json 和 updates.jsonl，不修改源文件；重复导入保留本地同 ID 会话。归档和重命名只作用于工作台记录。
+
+新会话文字和图片草稿保存在应用数据目录的 `draft.json`。内容未变的会话不会因浏览和退出而重复保存、改变更新时间。归档、重命名期间禁止切换会话，避免异步操作作用到另一条会话。
+
+子任务的创建、进度、完成事件和独立正文保存在父会话的 `subagents` 字段中。恢复历史时，未结束的子任务显示“待确认状态”，不会假定它仍在运行。子任务卡片提供刷新状态和单独取消；操作当前连接中的子任务。尚未提供手动派发或恢复子任务的独立入口。
+
+协议依据：[Grok 扩展通知定义](https://github.com/xai-org/grok-build/blob/main/crates/codegen/xai-grok-shell/src/extensions/notification.rs)。本机真实测试确认子任务通知使用 `_x.ai/session_notification`；正文使用带独立 `sessionId` 的 `session/update`。
 
 本说明描述当前实现，不代表已支持多会话并行或跨平台验证。

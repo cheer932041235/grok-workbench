@@ -41,6 +41,20 @@ export type Block =
 export interface Transcript {
   blocks: Block[];
   plan: PlanEntry[];
+  subagents?: Subagent[];
+}
+export interface Subagent {
+  id: string;
+  parentId: string;
+  description: string;
+  agentType: string;
+  status: string;
+  output?: string;
+  error?: string;
+  turns?: number;
+  toolCalls?: number;
+  durationMs?: number;
+  transcript: Transcript;
 }
 export interface SessionRecord extends Transcript {
   archived?: boolean;
@@ -89,7 +103,7 @@ export function applyUpdate(state: Transcript, raw: Record<string, unknown>): Tr
           : "user";
     const last = blocks.at(-1);
     if (last && last.type === type && "text" in last)
-      blocks[blocks.length - 1] = { type, text: last.text + content.text };
+      blocks[blocks.length - 1] = { ...last, text: last.text + content.text };
     else blocks.push({ type, text: content.text });
   } else if (kind === "tool_call" || kind === "tool_call_update") {
     const tool = raw as unknown as Tool;
@@ -103,9 +117,9 @@ export function applyUpdate(state: Transcript, raw: Record<string, unknown>): Tr
         blocks[index] = { type: "tool", tool: { ...previous.tool, ...tool } };
     }
   } else if (kind === "plan") {
-    return { blocks, plan: (raw.entries as PlanEntry[]) ?? [] };
+    return { ...state, blocks, plan: (raw.entries as PlanEntry[]) ?? [] };
   }
-  return { blocks, plan: state.plan };
+  return { ...state, blocks };
 }
 
 export function toolText(tool: Tool): string {

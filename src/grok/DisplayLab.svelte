@@ -3,6 +3,7 @@
   import ToolCard from "./ToolCard.svelte";
   import InteractionCard from "./InteractionCard.svelte";
   import ThoughtBlock from "./ThoughtBlock.svelte";
+  import SubagentCard from "./SubagentCard.svelte";
   let width = $state(900);
   let size = $state(18);
   let stream = $state("");
@@ -68,6 +69,23 @@ $$\begin{aligned}y_i(w^\top x_i+b)&\ge 1-\xi_i\\\xi_i&\ge0\end{aligned}$$
     >
   </nav>
   <div class="samples" style={`width:min(${width}px,100%)`}>
+    <section id="subagents">
+      <h2>子任务 · 运行状态与富文本结果</h2>
+      <SubagentCard
+        agent={{
+          id: "demo-child",
+          parentId: "demo-root",
+          description: "检查历史恢复与公式显示",
+          agentType: "explore",
+          status: "completed",
+          turns: 2,
+          toolCalls: 3,
+          durationMs: 12500,
+          output: formula,
+          transcript: { blocks: [], plan: [] },
+        }}
+      />
+    </section>
     <section id="formula">
       <h2>01 · 公式</h2>
       <RichText text={formula} />

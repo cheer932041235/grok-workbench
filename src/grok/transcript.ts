@@ -30,6 +30,18 @@ export function exportMarkdown(record: SessionRecord): string {
           .join("\n\n");
         return `## 工具：${tool.title ?? tool.kind ?? "工具调用"}\n\n${content || toolText(tool) || tool.status || ""}`;
       })
-      .join("\n\n")
+      .join("\n\n") +
+    (record.subagents ?? [])
+      .map(
+        (agent) =>
+          `\n\n---\n\n${exportMarkdown({
+            ...record,
+            ...agent.transcript,
+            sessionId: agent.id,
+            title: `子任务：${agent.description}`,
+            subagents: undefined,
+          })}\n\n状态：${agent.status}\n\n${agent.output ?? ""}${agent.error ? `\n\n错误：${agent.error}` : ""}`,
+      )
+      .join("")
   );
 }

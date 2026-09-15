@@ -175,32 +175,41 @@ fn history_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
 
 #[tauri::command]
 pub fn grok_save(app: tauri::AppHandle, record: Value) -> Result<(), String> {
-    let id = record["sessionId"].as_str().ok_or("缺少会话 ID")?;
-    if id.is_empty() || !id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') {
-        return Err("会话 ID 无效".into());
-    }
-    let data = serde_json::to_vec_pretty(&record).map_err(|e| e.to_string())?;
-    std::fs::write(history_dir(&app)?.join(format!("{id}.json")), data).map_err(|e| e.to_string())
+    crate::history::save(&history_dir(&app)?, &record)
 }
 
 #[tauri::command]
-pub fn grok_history(app: tauri::AppHandle) -> Result<Vec<Value>, String> {
-    let mut records = Vec::new();
-    for entry in std::fs::read_dir(history_dir(&app)?).map_err(|e| e.to_string())? {
-        let path = entry.map_err(|e| e.to_string())?.path();
-        if path.extension().is_some_and(|e| e == "json") {
-            let data = std::fs::read(&path).map_err(|e| e.to_string())?;
-            records.push(
-                serde_json::from_slice::<Value>(&data)
-                    .map_err(|e| format!("历史记录 {}：{e}", path.display()))?,
-            );
-        }
-    }
-    records.sort_by(|a, b| b["updatedAt"].as_str().cmp(&a["updatedAt"].as_str()));
-    Ok(records)
+pub fn grok_history(app: tauri::AppHandle) -> Result<Value, String> {
+    crate::history::load(&history_dir(&app)?)
 }
-
 #[tauri::command]
 pub fn grok_export(path: String, content: String) -> Result<(), String> {
     std::fs::write(path, content).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn grok_save_draft(app: tauri::AppHandle, draft: Value) -> Result<(), String> {
+    let path = history_dir(&app)?.with_file_name("draft.json");
+    crate::history::write_json(&path, &draft)
+}
+
+#[tauri::command]
+pub fn grok_load_draft(app: tauri::AppHandle) -> Result<Option<Value>, String> {
+    let path = history_dir(&app)?.with_file_name("draft.json");
+    crate::history::load_draft(&path)
+}
+
+#[tauri::command]
+pub fn grok_load(app: tauri::AppHandle, session_id: String) -> Result<Value, String> {
+    crate::history::load_record(&history_dir(&app)?, &session_id)
+}
+
+#[tauri::command]
+pub async fn grok_import_history(app: tauri::AppHandle) -> Result<Value, String> {
+    let dir = history_dir(&app)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::history::import_grok(&dir, &crate::history::grok_home()?)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }

@@ -1,4 +1,5 @@
 mod grok;
+mod history;
 use tauri::Manager;
 
 #[tauri::command]
@@ -29,6 +30,10 @@ pub fn run() {
             grok::grok_disconnect,
             grok::grok_save,
             grok::grok_history,
+            grok::grok_load,
+            grok::grok_import_history,
+            grok::grok_save_draft,
+            grok::grok_load_draft,
             grok::grok_export,
             grok_quit
         ])

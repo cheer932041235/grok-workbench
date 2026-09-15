@@ -5,6 +5,7 @@ import type { RpcMessage } from "./protocol";
 export class GrokClient {
   generation = 0;
   private nextId = 0;
+  private connectionAttempt = 0;
   private pending = new Map<
     number | string,
     { resolve: (value: Record<string, unknown>) => void; reject: (error: Error) => void }
@@ -46,11 +47,14 @@ export class GrokClient {
     );
   }
   async connect(executable: string, cwd: string, permissionMode: string) {
-    this.generation = await invoke<number>("grok_connect", { executable, cwd, permissionMode });
+    const attempt = ++this.connectionAttempt;
+    const generation = await invoke<number>("grok_connect", { executable, cwd, permissionMode });
+    if (attempt !== this.connectionAttempt) throw new Error("连接已取消");
+    this.generation = generation;
     return this.request("initialize", {
       protocolVersion: 1,
       clientCapabilities: {},
-      clientInfo: { name: "grok-workbench", version: "0.1.0" },
+      clientInfo: { name: "grok-workbench", version: "0.2.0" },
     });
   }
   send(message: RpcMessage) {
@@ -74,6 +78,7 @@ export class GrokClient {
     this.pending.clear();
   }
   async disconnect() {
+    ++this.connectionAttempt;
     this.generation = 0;
     this.rejectPending("会话已断开");
     await invoke("grok_disconnect");

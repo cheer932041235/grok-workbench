@@ -7,7 +7,6 @@
   import { GrokClient } from "../grok/client";
   import { PromptQueue, type QueueView } from "../grok/queue";
   import {
-    applyUpdate,
     type Transcript,
     type SessionRecord,
     type Permission,
@@ -17,6 +16,16 @@
   import RichText from "../grok/RichText.svelte";
   import { readImage, imageUrl, imageContent, type PromptImage } from "../grok/images";
   import ToolCard from "../grok/ToolCard.svelte";
+  import SubagentCard from "../grok/SubagentCard.svelte";
+  import { refreshSubagent, cancelSubagent } from "../grok/subagent-management";
+  import {
+    historySummary,
+    materializeHistory,
+    type HistorySummary,
+    type StoredSession,
+  } from "../grok/history";
+  import { SessionSaver } from "../grok/persistence";
+  import { applySessionEvent, restoreSubagents, sessionMethods } from "../grok/session-events";
   import ThoughtBlock from "../grok/ThoughtBlock.svelte";
   import PanelResize from "../grok/PanelResize.svelte";
   import InteractionCard from "../grok/InteractionCard.svelte";
@@ -45,6 +54,7 @@
   let version = $state("");
   let prompt = $state("");
   let draftImages = $state<PromptImage[]>([]);
+  let unsentPrompt = $state<{ text: string; images: PromptImage[] } | undefined>();
   let imageLoading = $state(false);
   let imageInput: HTMLInputElement;
   async function addImages(files: File[]) {
@@ -74,7 +84,8 @@
   let sessionId = $state("");
   let title = $state("新会话");
   let transcript = $state<Transcript>({ blocks: [], plan: [] });
-  let history = $state<SessionRecord[]>([]);
+  let history = $state<HistorySummary[]>([]);
+  let recordSource = $state<string | undefined>();
   let archived = $state(false);
   let showArchived = $state(false);
   let renamingId = $state("");
@@ -180,9 +191,10 @@
   function log(text: string) {
     diagnostics = [...diagnostics.slice(-79), text];
   }
-  function record(): SessionRecord {
+  function record(): StoredSession {
     return {
       sessionId,
+      source: recordSource,
       archived,
       title,
       cwd,
@@ -199,32 +211,90 @@
     localStorage.setItem("grok-workbench.activeSession", sessionId);
     if (!sessionId) {
       localStorage.setItem("grok-workbench.newDraft", prompt);
-      return Promise.resolve();
+      const draft = { text: prompt, images: [...draftImages], unsentPrompt };
+      saveQueue = saveQueue.catch(() => {}).then(() => invoke<void>("grok_save_draft", { draft }));
+      return saveQueue;
     }
-    const snapshot = JSON.parse(JSON.stringify(record())) as SessionRecord;
-    saveQueue = saveQueue
-      .catch(() => {})
-      .then(async () => {
-        await invoke("grok_save", { record: snapshot });
-        history = [snapshot, ...history.filter((h) => h.sessionId !== snapshot.sessionId)];
-      });
-    return saveQueue;
+    const snapshot = JSON.parse(JSON.stringify(record())) as StoredSession;
+    return saveQueue.then(() => sessionSaver.save(snapshot));
   }
-  async function manageHistory(item: SessionRecord, patch: { title?: string; archived?: boolean }) {
-    if (busy || connecting || switching || configChanging || closing || managing) return;
+  const sessionSaver = new SessionSaver(
+    async (snapshot) => {
+      await invoke("grok_save", { record: snapshot });
+    },
+    (snapshot) => {
+      const summary = historySummary(snapshot);
+      history = [summary, ...history.filter((h) => h.sessionId !== summary.sessionId)].sort(
+        (a, b) => b.updatedAt.localeCompare(a.updatedAt),
+      );
+    },
+  );
+  async function readSession(id: string): Promise<StoredSession> {
+    const raw = await invoke<StoredSession>("grok_load", { sessionId: id });
+    const saved = materializeHistory(raw);
+    if (raw.importedEvents) await invoke("grok_save", { record: saved });
+    return saved;
+  }
+  async function importHistory() {
+    if (
+      !mounted ||
+      busy ||
+      connecting ||
+      switching ||
+      managing ||
+      configChanging ||
+      closing ||
+      imageLoading
+    )
+      return;
+    managing = true;
+    notice = "正在导入 Grok 历史…";
+    try {
+      await persist();
+      const result = await invoke<{ imported: number; skipped: number; warnings: string[] }>(
+        "grok_import_history",
+      );
+      const list = await invoke<{ records: HistorySummary[]; warnings: string[] }>("grok_history");
+      history = list.records;
+      const warnings = [...result.warnings, ...list.warnings];
+      notice = `已导入 ${result.imported} 个会话，跳过 ${result.skipped} 个会话${warnings.length ? `；${warnings.length} 项提示：${warnings.join("；")}` : ""}`;
+    } catch (e) {
+      report(e);
+      notice = "导入未完成，请查看错误信息";
+    } finally {
+      managing = false;
+    }
+  }
+  async function restoreDraft() {
+    const draft = await invoke<{
+      text: string;
+      images: PromptImage[];
+      unsentPrompt?: { text: string; images: PromptImage[] };
+    } | null>("grok_load_draft");
+    prompt = draft?.text ?? localStorage.getItem("grok-workbench.newDraft") ?? "";
+    draftImages = draft?.images ?? [];
+    unsentPrompt = draft?.unsentPrompt;
+  }
+  async function manageHistory(
+    item: HistorySummary,
+    patch: { title?: string; archived?: boolean },
+  ) {
+    if (busy || connecting || switching || configChanging || closing || managing || imageLoading)
+      return;
     managing = true;
     try {
       clearTimeout(saveTimer);
       saveTimer = undefined;
       await persist();
-      const current = history.find((h) => h.sessionId === item.sessionId) ?? item;
+      const current = await readSession(item.sessionId);
       const updated = JSON.parse(JSON.stringify({ ...current, ...patch })) as SessionRecord;
       await invoke("grok_save", { record: updated });
-      history = history.map((h) => (h.sessionId === item.sessionId ? updated : h));
+      history = history.map((h) => (h.sessionId === item.sessionId ? historySummary(updated) : h));
       if (item.sessionId === sessionId) {
+        sessionSaver.remember(updated);
         title = updated.title;
         archived = Boolean(updated.archived);
-        if (patch.archived === true) await fresh();
+        if (patch.archived === true) await fresh(true);
       }
       renamingId = "";
     } catch (e) {
@@ -244,15 +314,41 @@
         if (follow) viewport?.scrollTo({ top: viewport.scrollHeight });
       });
   }
+  async function manageSubagent(id: string, action: "refresh" | "cancel"): Promise<string> {
+    if (!ready || connecting || switching || closing || managing || configChanging)
+      throw new Error("请先连接当前会话");
+    const rootId = sessionId;
+    const generation = client.generation;
+    const request = client.request.bind(client);
+    if (action === "cancel") return cancelSubagent(request, id);
+    const agent = transcript.subagents?.find((item) => item.id === id);
+    if (!agent) throw new Error("子任务记录不存在");
+    const updated = await refreshSubagent(request, agent);
+    if (rootId !== sessionId || generation !== client.generation) throw new Error("会话连接已改变");
+    transcript = {
+      ...transcript,
+      subagents: transcript.subagents?.map((item) =>
+        item.id === id ? { ...updated, transcript: item.transcript } : item,
+      ),
+    };
+    await persist();
+    return "子任务状态已更新";
+  }
   function receive(message: RpcMessage) {
-    if (message.method === "session/update") {
+    if (sessionMethods.includes(message.method ?? "")) {
       const update = message.params?.update as Record<string, unknown>;
       if (!update) return;
-      if (update.sessionUpdate === "config_option_update")
+      if (
+        message.params?.sessionId === sessionId &&
+        update.sessionUpdate === "config_option_update"
+      )
         options = update.configOptions as ConfigOption[];
-      if (!replaying && update.sessionUpdate !== "user_message_chunk") {
-        transcript = applyUpdate(transcript, update);
-        changed();
+      if (!replaying) {
+        const next = applySessionEvent(transcript, sessionId, message);
+        if (next !== transcript) {
+          transcript = next;
+          changed();
+        }
       }
     } else if (message.method === "session/request_permission" && message.id !== undefined) {
       permissions = [
@@ -299,7 +395,16 @@
         title: "选择 Grok 工作目录",
       });
       if (typeof selected === "string") {
-        if (switching || busy || connecting || configChanging || closing) return;
+        if (
+          switching ||
+          busy ||
+          connecting ||
+          configChanging ||
+          closing ||
+          imageLoading ||
+          managing
+        )
+          return;
         await fresh();
         cwd = selected;
         localStorage.setItem("grok-workbench.cwd", cwd);
@@ -308,8 +413,17 @@
       report(e);
     }
   }
-  async function fresh() {
-    if (imageLoading || switching || busy || connecting || configChanging || closing) return;
+  async function fresh(fromArchive = false) {
+    if (
+      imageLoading ||
+      switching ||
+      busy ||
+      connecting ||
+      configChanging ||
+      closing ||
+      (managing && !fromArchive)
+    )
+      return;
     switching = true;
     try {
       clearTimeout(saveTimer);
@@ -318,10 +432,12 @@
       if (client) await client.disconnect();
       ready = false;
       sessionId = "";
+      recordSource = undefined;
+      sessionSaver.remember();
       draftImages = [];
       archived = false;
       pendingConfig = {};
-      prompt = localStorage.getItem("grok-workbench.newDraft") ?? "";
+      await restoreDraft();
       interactions = [];
       messageQueue.restore([]);
       editingQueueId = null;
@@ -338,16 +454,20 @@
       switching = false;
     }
   }
-  async function load(saved: SessionRecord) {
-    if (saved.sessionId === sessionId) return;
-    if (imageLoading || switching || busy || connecting || configChanging || closing) return;
+  async function load(item: HistorySummary) {
+    if (item.sessionId === sessionId) return;
+    if (imageLoading || switching || busy || connecting || configChanging || closing || managing)
+      return;
     switching = true;
     try {
       clearTimeout(saveTimer);
       saveTimer = undefined;
       await persist();
+      const saved = await readSession(item.sessionId);
       await client.disconnect();
       ready = false;
+      sessionSaver.remember(saved);
+      recordSource = saved.source;
       sessionId = saved.sessionId;
       localStorage.setItem("grok-workbench.activeSession", sessionId);
       archived = Boolean(saved.archived);
@@ -359,9 +479,9 @@
       projectPath = cwd;
       title = saved.title;
       transcript = JSON.parse(
-        JSON.stringify({ blocks: saved.blocks, plan: saved.plan }),
+        JSON.stringify({ blocks: saved.blocks, plan: saved.plan, subagents: saved.subagents }),
       ) as Transcript;
-      transcript = finishTools(transcript);
+      transcript = restoreSubagents(finishTools(transcript));
       messageQueue.restore(saved.queuedPrompts ?? []);
       editingQueueId = null;
       options = [];
@@ -377,7 +497,17 @@
     }
   }
   async function useProjectPath() {
-    if (!projectPath.trim() || switching || busy || connecting || configChanging || closing) return;
+    if (
+      !projectPath.trim() ||
+      switching ||
+      busy ||
+      connecting ||
+      configChanging ||
+      closing ||
+      imageLoading ||
+      managing
+    )
+      return;
     try {
       await fresh();
       cwd = projectPath.trim();
@@ -426,7 +556,10 @@
       status = "已连接 · 就绪";
       localStorage.setItem("grok-workbench.cwd", cwd);
       await persist();
+      unsentPrompt = undefined;
+      await invoke("grok_save_draft", { draft: { text: "", images: [] } });
     } catch (e) {
+      ready = false;
       await client.disconnect();
       status = "连接失败";
       throw e;
@@ -465,6 +598,7 @@
   async function executePrompt(text: string, images: PromptImage[] = []): Promise<boolean> {
     error = "";
     let completed = false;
+    if (!sessionId) unsentPrompt = { text, images: [...images] };
     try {
       if (!transcript.blocks.some((b) => b.type === "user"))
         title = text.slice(0, 45) || images[0]?.name || "图片对话";
@@ -473,6 +607,7 @@
         blocks: [...transcript.blocks, { type: "user", text, images }],
       };
       changed();
+      await persist();
       if (ready && activePermissionMode !== permissionMode) {
         await client.disconnect();
         ready = false;
@@ -540,7 +675,10 @@
   }
   async function disconnect() {
     messageQueue.pause();
+    const pendingConnection = connection;
     await client.disconnect();
+    await pendingConnection?.catch(() => {});
+    transcript = restoreSubagents(transcript);
     ready = false;
     stopping = false;
     connecting = false;
@@ -670,10 +808,13 @@
         client.dispose();
         return;
       }
-      mounted = true;
       unlistenClose = await getCurrentWindow().onCloseRequested(async (event) => {
         event.preventDefault();
         if (closing) return;
+        if (imageLoading) {
+          notice = "正在读取图片，请稍后关闭窗口";
+          return;
+        }
         closing = true;
         messageQueue.pause();
         try {
@@ -686,11 +827,27 @@
           report(e);
         }
       });
-      history = await invoke<SessionRecord[]>("grok_history");
-      const active = history.find(
+      const savedHistory = await invoke<{ records: HistorySummary[]; warnings: string[] }>(
+        "grok_history",
+      );
+      history = savedHistory.records;
+      if (savedHistory.warnings.length) {
+        notice = `有 ${savedHistory.warnings.length} 份历史记录无法读取，原文件已保留：${savedHistory.warnings.join("；")}`;
+      }
+      const activeSummary = history.find(
         (item) => item.sessionId === localStorage.getItem("grok-workbench.activeSession"),
       );
+      let active: StoredSession | undefined;
+      if (activeSummary) {
+        try {
+          active = await readSession(activeSummary.sessionId);
+        } catch (e) {
+          report(e);
+        }
+      }
       if (active) {
+        sessionSaver.remember(active);
+        recordSource = active.source;
         sessionId = active.sessionId;
         archived = Boolean(active.archived);
         showArchived = archived;
@@ -700,11 +857,14 @@
         title = active.title;
         prompt = active.draft ?? "";
         draftImages = [...(active.draftImages ?? [])];
-        transcript = finishTools({ blocks: active.blocks, plan: active.plan });
+        transcript = restoreSubagents(
+          finishTools({ blocks: active.blocks, plan: active.plan, subagents: active.subagents }),
+        );
         messageQueue.restore(active.queuedPrompts ?? []);
         status = "历史会话 · 可继续";
-      } else prompt = localStorage.getItem("grok-workbench.newDraft") ?? "";
+      } else await restoreDraft();
       await checkCli();
+      mounted = true;
     })().catch(report);
     return () => {
       disposed = true;
@@ -752,6 +912,18 @@
     <div class="sidebar-label history-label">
       会话记录 <span>{history.filter((h) => Boolean(h.archived) === showArchived).length}</span>
     </div>
+    <button
+      class="history-import"
+      disabled={!mounted ||
+        busy ||
+        connecting ||
+        switching ||
+        managing ||
+        configChanging ||
+        closing ||
+        imageLoading}
+      onclick={importHistory}>{managing ? "正在处理历史…" : "导入 Grok 历史"}</button
+    >
     <div class="history-tabs">
       <button
         class:chosen={!showArchived}
@@ -823,7 +995,7 @@
         </p>{/if}
     </div>
     <div class="sidebar-bottom">
-      <div class="local-label"><i></i> 本地工作台 <span>v0.1</span></div>
+      <div class="local-label"><i></i> 本地工作台 <span>v0.2</span></div>
       <button onclick={() => (settings = !settings)}>⚙ <span>连接与显示设置</span></button><small
         >基于 OpenCovibe · Apache-2.0</small
       >
@@ -951,24 +1123,39 @@
             <div class="welcome-note">选择左侧项目文件夹，然后发送第一条任务</div>
           </section>
         {/if}
-        {#each visibleBlocks as block}
-          {#if block.type === "user"}<article class="user-message">
-              <div class="message-label">你</div>
-              <div>{block.text}</div>
-              {#if block.images?.length}<div class="message-images">
-                  {#each block.images as image}<img src={imageUrl(image)} alt={image.name} />{/each}
-                </div>{/if}
-            </article>
-          {:else if block.type === "answer"}<article class="answer-message">
-              <div class="message-label">
-                <span class="mini-mark">╱</span> GROK
-                <button onclick={() => copyAnswer(block.text)}>复制</button>
-              </div>
-              <RichText text={block.text} />
-            </article>
-          {:else if block.type === "thought"}<ThoughtBlock text={block.text} />
-          {:else if block.type === "tool"}<ToolCard tool={block.tool} />{/if}
-        {/each}
+        {#each transcript.subagents ?? [] as agent (agent.id)}<SubagentCard
+            {agent}
+            canManage={ready &&
+              !connecting &&
+              !switching &&
+              !closing &&
+              !managing &&
+              !configChanging}
+            manage={(action) => manageSubagent(agent.id, action)}
+          />{/each}
+        {#key sessionId + ":" + filter}
+          {#each visibleBlocks as block}
+            {#if block.type === "user"}<article class="user-message">
+                <div class="message-label">你</div>
+                <div>{block.text}</div>
+                {#if block.images?.length}<div class="message-images">
+                    {#each block.images as image}<img
+                        src={imageUrl(image)}
+                        alt={image.name}
+                      />{/each}
+                  </div>{/if}
+              </article>
+            {:else if block.type === "answer"}<article class="answer-message">
+                <div class="message-label">
+                  <span class="mini-mark">╱</span> GROK
+                  <button onclick={() => copyAnswer(block.text)}>复制</button>
+                </div>
+                <RichText text={block.text} />
+              </article>
+            {:else if block.type === "thought"}<ThoughtBlock text={block.text} />
+            {:else if block.type === "tool"}<ToolCard tool={block.tool} />{/if}
+          {/each}
+        {/key}
         {#if busy}<div class="working-line">
             <span class="status-dot pulse"></span>{interactions.length
               ? status
@@ -1094,6 +1281,27 @@
                 >
               </div>{/each}
           </div>{/if}
+        {#if !sessionId && unsentPrompt && !busy}
+          <div class="notice-banner" role="status">
+            <span
+              >上次需求尚未发送：{unsentPrompt.text || "图片需求"}（{unsentPrompt.images.length} 张图片）</span
+            >
+            <button
+              type="button"
+              disabled={!mounted || connecting || !cwd}
+              onclick={() => {
+                if (unsentPrompt) messageQueue.enqueue(unsentPrompt.text, unsentPrompt.images);
+              }}>重新发送</button
+            >
+            <button
+              type="button"
+              onclick={() => {
+                unsentPrompt = undefined;
+                void persist().catch(report);
+              }}>移除</button
+            >
+          </div>
+        {/if}
         <textarea
           onpaste={pasteImages}
           aria-label="给 Grok 的任务"
@@ -1108,7 +1316,7 @@
           onkeydown={keydown}
           placeholder={busy ? "继续输入下一条需求，按 Enter 加入队列…" : "告诉 Grok 你想做什么…"}
           rows="3"
-          disabled={closing || imageLoading || managing || switching}
+          disabled={!mounted || closing || imageLoading || managing || switching}
         ></textarea>
         <div class="composer-toolbar">
           <button
