@@ -4,9 +4,9 @@
 
 为 Grok Build 设计的桌面工作台。阅读流式回答与公式，带图提问，连续安排需求，再把完成的对话归档。
 
-[**下载 Windows 安装包**](https://github.com/cheer932041235/grok-workbench/releases/download/v0.2.2/GrokWorkbench_0.2.2_x64-setup.exe) · [使用指南](docs/guide.md) · [参与贡献](CONTRIBUTING.md) · [反馈问题](https://github.com/cheer932041235/grok-workbench/issues)
+[**下载 Windows 安装包**](https://github.com/cheer932041235/grok-workbench/releases/download/v0.2.3/GrokWorkbench_0.2.3_x64-setup.exe) · [使用指南](docs/guide.md) · [参与贡献](CONTRIBUTING.md) · [反馈问题](https://github.com/cheer932041235/grok-workbench/issues)
 
-**0.2.2 · 早期预览 · Windows x64**。需要单独安装并登录 Grok Build CLI；已联调版本为 1.0.25。
+**0.2.3 · 早期预览 · Windows x64**。需要单独安装并登录 Grok Build CLI；已联调版本为 1.0.25。
 
 ![Grok Workbench 中的公式与代码阅读界面](docs/images/reading.png)
 
@@ -31,6 +31,12 @@
 | 提前调整下一轮 | 输出期间预选模型、思考强度和授权模式 |
 | 专注当前工作 | 调整两侧面板宽度，筛选回答或工具，切换专注模式 |
 
+### 快速回到每一次提问
+
+右侧目录按问题编号排列，点击即可定位。当前阅读位置与正文提问卡片同步高亮；输出期间也能回看前面的内容。
+
+![对话目录与当前问题定位](docs/images/outline.png)
+
 ### 连续安排需求
 
 ![待执行需求的编辑、排序与继续队列入口](docs/images/queue.png)
@@ -42,7 +48,7 @@
 ## 三步开始
 
 1. 按 [Grok Build 官方说明](https://github.com/xai-org/grok-build#installing-the-released-binary) 安装 CLI，在终端运行 `grok` 完成登录。
-2. [下载安装包](https://github.com/cheer932041235/grok-workbench/releases/download/v0.2.2/GrokWorkbench_0.2.2_x64-setup.exe)，从开始菜单打开 Grok Workbench。
+2. [下载安装包](https://github.com/cheer932041235/grok-workbench/releases/download/v0.2.3/GrokWorkbench_0.2.3_x64-setup.exe)，从开始菜单打开 Grok Workbench。
 3. 选择项目文件夹，检查授权模式，发送第一条需求。找不到 CLI 时，在设置中填写 `grok.exe` 的完整路径。
 
 安装版不需要 Node.js 或 Rust。系统缺少 WebView2 时，安装程序需要联网获取运行时。
@@ -74,7 +80,7 @@ npm run tauri -- dev
 
 ## 当前状态
 
-已完成 Windows 上的安装启动、真实 Grok 识图、流式公式、排队执行、提问回传、计划批准和历史归档联调。自动测试包含 34 项前端用例和 7 项 Rust 用例；验证范围见 [测试说明](docs/testing.md)。
+已完成 Windows 上的安装启动、真实 Grok 识图、流式公式、排队执行、提问回传、计划批准和历史归档联调。自动测试包含 36 项前端用例和 7 项 Rust 用例；验证范围见 [测试说明](docs/testing.md)。
 
 仍处于早期预览：同时执行一个会话，支持从本机 Grok CLI/TUI 导入已有会话，历史列表按需读取正文；支持子任务过程显示、刷新和取消。暂不支持通用文件附件或 Mermaid，也不提供手动创建/恢复子任务的独立入口。macOS、Linux 暂未提供经过验证的安装包。
 

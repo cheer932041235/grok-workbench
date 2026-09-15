@@ -20,6 +20,8 @@
     type RpcMessage,
     type ConfigOption,
   } from "../grok/protocol";
+  import ConversationOutline from "../grok/ConversationOutline.svelte";
+  import { questionOutline } from "../grok/conversation-outline";
   import RichText from "../grok/RichText.svelte";
   import { readImage, imageUrl, imageContent, type PromptImage } from "../grok/images";
   import ToolCard from "../grok/ToolCard.svelte";
@@ -163,6 +165,65 @@
   let configChanging = $state(false);
   let switching = $state(false);
   let follow = $state(true);
+  let readingEarlier = false;
+  let activeQuestion = $state(-1);
+  let outlinePopup = $state(false);
+  let inspectorTab = $state("outline");
+  let outlineFrame = 0;
+  const questions = $derived(questionOutline(transcript.blocks));
+  const questionNumbers = $derived(new Map(questions.map((q) => [q.blockIndex, q.number])));
+  $effect(() => {
+    void sessionId;
+    readingEarlier = false;
+    activeQuestion = -1;
+    outlinePopup = false;
+  });
+  function conversationScrolled() {
+    if (!viewport) return;
+    if (!readingEarlier)
+      follow = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 100;
+    if (outlineFrame) return;
+    outlineFrame = requestAnimationFrame(() => {
+      outlineFrame = 0;
+      const top = viewport.getBoundingClientRect().top + 25;
+      const anchors = viewport.querySelectorAll<HTMLElement>("[data-question-index]");
+      let index = -1;
+      for (const anchor of anchors) {
+        if (index === -1 || anchor.getBoundingClientRect().top <= top)
+          index = Number(anchor.dataset.questionIndex);
+        else break;
+      }
+      if (anchors.length && viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 2)
+        index = Number(anchors[anchors.length - 1].dataset.questionIndex);
+      activeQuestion = index;
+    });
+  }
+  async function jumpToQuestion(index: number) {
+    if (switching) return;
+    const selectedSession = sessionId;
+    readingEarlier = true;
+    follow = false;
+    outlinePopup = false;
+    if (filter === "tools") filter = "all";
+    await tick();
+    if (selectedSession !== sessionId) return;
+    const anchor = viewport?.querySelector<HTMLElement>(`[data-question-index="${index}"]`);
+    if (!anchor) return;
+    viewport.scrollTo({
+      top:
+        viewport.scrollTop +
+        anchor.getBoundingClientRect().top -
+        viewport.getBoundingClientRect().top -
+        20,
+    });
+    anchor.focus({ preventScroll: true });
+    activeQuestion = index;
+  }
+  function returnToLatest() {
+    readingEarlier = false;
+    follow = true;
+    changed();
+  }
   let viewport: HTMLDivElement;
   let diagnostics = $state<string[]>([]);
   let mounted = $state(false);
@@ -175,11 +236,15 @@
   let canLoad = false;
   let connection: Promise<void> | undefined;
   let visibleBlocks = $derived(
-    transcript.blocks.filter(
-      (b) =>
-        filter === "all" ||
-        (filter === "answers" ? b.type === "answer" || b.type === "user" : b.type === "tool"),
-    ),
+    transcript.blocks
+      .map((block, blockIndex) => ({ block, blockIndex }))
+      .filter(
+        ({ block }) =>
+          filter === "all" ||
+          (filter === "answers"
+            ? block.type === "answer" || block.type === "user"
+            : block.type === "tool"),
+      ),
   );
   let tools = $derived(transcript.blocks.filter((b) => b.type === "tool"));
   let completed = $derived(
@@ -905,6 +970,7 @@
       disposed = true;
       clearTimeout(saveTimer);
       clearTimeout(draftTimer);
+      cancelAnimationFrame(outlineFrame);
       unlistenClose?.();
       client.dispose();
     };
@@ -1066,6 +1132,11 @@
       </div>
       <div class="view-controls">
         <button
+          class="outline-toggle"
+          aria-expanded={outlinePopup}
+          onclick={() => (outlinePopup = !outlinePopup)}>目录 {questions.length}</button
+        >
+        <button
           class:chosen={focusMode}
           onclick={() => {
             focusMode = !focusMode;
@@ -1117,7 +1188,15 @@
         </label>
         <p>正文 {fontSize}px；使用顶部 A− / A＋ 同时调整正文、代码和工具输出。</p>
         <button disabled={!mounted || busy || connecting} onclick={checkCli}>检测 CLI</button><label
-          class="check"><input type="checkbox" bind:checked={follow} /> 跟随最新输出</label
+          class="check"
+          ><input
+            type="checkbox"
+            bind:checked={follow}
+            onchange={() => {
+              readingEarlier = !follow;
+              if (follow) changed();
+            }}
+          /> 跟随最新输出</label
         >
         <details>
           <summary>连接日志（{diagnostics.length}）</summary>
@@ -1131,14 +1210,7 @@
         <span>{error}</span><button onclick={() => (error = "")} aria-label="关闭错误提示">×</button
         >
       </div>{/if}
-    <div
-      class="conversation"
-      bind:this={viewport}
-      onscroll={() => {
-        if (viewport)
-          follow = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 100;
-      }}
-    >
+    <div class="conversation" bind:this={viewport} onscroll={conversationScrolled}>
       <div class="reading-column">
         {#if !transcript.blocks.length}
           <section class="welcome">
@@ -1172,9 +1244,19 @@
             manage={(action) => manageSubagent(agent.id, action)}
           />{/each}
         {#key sessionId + ":" + filter}
-          {#each visibleBlocks as block}
-            {#if block.type === "user"}<article class="user-message">
-                <div class="message-label">你</div>
+          {#each visibleBlocks as { block, blockIndex } (blockIndex)}
+            {#if block.type === "user"}<article
+                class="user-message"
+                class:question-selected={activeQuestion === blockIndex}
+                data-question-index={blockIndex}
+                tabindex="-1"
+                aria-label={`第 ${questionNumbers.get(blockIndex)} 个问题`}
+              >
+                <div class="message-label">
+                  <span>你的问题</span><span class="question-badge"
+                    >{String(questionNumbers.get(blockIndex)).padStart(2, "0")}</span
+                  >
+                </div>
                 <div>{block.text}</div>
                 {#if block.images?.length}<div class="message-images">
                     {#each block.images as image}<img
@@ -1226,12 +1308,7 @@
               >{/each}
           </div>
         </div>{/each}
-      {#if !follow && busy}<button
-          class="follow-button"
-          onclick={() => {
-            follow = true;
-            changed();
-          }}>↓ 回到最新输出</button
+      {#if !follow}<button class="follow-button" onclick={returnToLatest}>↓ 回到最新输出</button
         >{/if}
       {#if queueView.pending.length}
         <section class="prompt-queue" aria-label="待执行需求">
@@ -1428,31 +1505,58 @@
       cwd={preview.cwd}
       onclose={() => (preview = undefined)}
     />{/if}
+  {#if outlinePopup}<aside class="outline-popup" aria-label="浮动对话目录">
+      <header>
+        <strong>对话目录 · {questions.length}</strong><button
+          aria-label="关闭对话目录"
+          onclick={() => (outlinePopup = false)}>×</button
+        >
+      </header>
+      <ConversationOutline entries={questions} active={activeQuestion} navigate={jumpToQuestion} />
+    </aside>{/if}
   <aside class="inspector">
-    <div class="inspector-heading">任务概览 <span>◉</span></div>
-    <div class="overview-state">
-      <small>当前状态</small><strong>{status}</strong>
-      <p>{ready ? "已连接本机 Grok CLI" : "连接后实时展示执行进展"}</p>
+    <div class="inspector-tabs">
+      <button class:chosen={inspectorTab === "outline"} onclick={() => (inspectorTab = "outline")}
+        >对话目录 <span>{questions.length}</span></button
+      ><button
+        class:chosen={inspectorTab === "overview"}
+        onclick={() => (inspectorTab = "overview")}>任务概览</button
+      >
     </div>
-    <div class="stats">
-      <div><strong>{tools.length}</strong><small>工具调用</small></div>
-      <div><strong>{completed}</strong><small>已完成</small></div>
-    </div>
-    <div class="inspector-label">执行计划</div>
-    {#if transcript.plan.length}<ol class="plan">
-        {#each transcript.plan as step}<li class:done={step.status === "completed"}>
-            <span
-              >{step.status === "completed" ? "✓" : step.status === "in_progress" ? "◉" : "○"}</span
-            >{step.content}
-          </li>{/each}
-      </ol>{:else}<div class="plan-empty">
-        <span>☷</span>
-        <p>Grok 的计划会显示在这里</p>
-        <small>跟随任务推进，查看每一步状态</small>
-      </div>{/if}
-    <div class="inspector-tip">
-      <span>阅读更轻松</span>
-      <p>思考与工具输出可展开查看。使用顶部筛选，只看回答或工具活动。</p>
-    </div>
+    {#if inspectorTab === "outline"}<ConversationOutline
+        entries={questions}
+        active={activeQuestion}
+        navigate={jumpToQuestion}
+      />{:else}
+      <div class="inspector-heading">任务概览 <span>◉</span></div>
+      <div class="overview-state">
+        <small>当前状态</small><strong>{status}</strong>
+        <p>{ready ? "已连接本机 Grok CLI" : "连接后实时展示执行进展"}</p>
+      </div>
+      <div class="stats">
+        <div><strong>{tools.length}</strong><small>工具调用</small></div>
+        <div><strong>{completed}</strong><small>已完成</small></div>
+      </div>
+      <div class="inspector-label">执行计划</div>
+      {#if transcript.plan.length}<ol class="plan">
+          {#each transcript.plan as step}<li class:done={step.status === "completed"}>
+              <span
+                >{step.status === "completed"
+                  ? "✓"
+                  : step.status === "in_progress"
+                    ? "◉"
+                    : "○"}</span
+              >{step.content}
+            </li>{/each}
+        </ol>{:else}<div class="plan-empty">
+          <span>☷</span>
+          <p>Grok 的计划会显示在这里</p>
+          <small>跟随任务推进，查看每一步状态</small>
+        </div>{/if}
+      <div class="inspector-tip">
+        <span>阅读更轻松</span>
+        <p>思考与工具输出可展开查看。使用顶部筛选，只看回答或工具活动。</p>
+      </div>
+    {/if}
   </aside>
 </div>

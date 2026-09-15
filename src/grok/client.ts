@@ -54,7 +54,7 @@ export class GrokClient {
     return this.request("initialize", {
       protocolVersion: 1,
       clientCapabilities: {},
-      clientInfo: { name: "grok-workbench", version: "0.2.2" },
+      clientInfo: { name: "grok-workbench", version: "0.2.3" },
     });
   }
   send(message: RpcMessage) {

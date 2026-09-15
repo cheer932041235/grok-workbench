@@ -1412,3 +1412,73 @@ header {
   overflow-wrap: anywhere;
   text-align: left;
 }
+
+.user-message {
+  border-left: 3px solid #9fb797;
+  background: #252e2b;
+  scroll-margin-top: 20px;
+}
+.user-message .message-label {
+  color: #c9ddc3;
+  font-weight: 600;
+  justify-content: space-between;
+}
+.user-message .question-badge {
+  font:
+    12px/1.6 Consolas,
+    monospace;
+  border: 1px solid #53694f;
+  border-radius: 5px;
+  padding: 1px 7px;
+}
+.user-message.question-selected {
+  border-color: #c0d9ad;
+  box-shadow: 0 0 0 1px #687e5d;
+}
+.user-message:focus {
+  outline: none;
+}
+.inspector-tabs {
+  display: flex;
+  gap: 5px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+.inspector-tabs button {
+  padding: 8px 7px;
+  font-size: 13px;
+  border-radius: 6px;
+  color: #a4aeba;
+}
+.inspector-tabs button.chosen {
+  background: #29312d;
+  color: #deebd8;
+}
+.inspector-tabs span {
+  font-size: 11px;
+  margin-left: 4px;
+}
+.outline-popup {
+  position: fixed;
+  z-index: 35;
+  right: 18px;
+  top: 140px;
+  bottom: 110px;
+  width: min(310px, calc(100vw - 36px));
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  background: #191e23;
+  border: 1px solid #4b5852;
+  border-radius: 12px;
+  box-shadow: 0 12px 40px #0007;
+}
+.outline-popup header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.outline-popup header button {
+  padding: 4px 9px;
+  font-size: 20px;
+}
