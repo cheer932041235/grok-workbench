@@ -13,6 +13,21 @@ async fn grok_quit(
     Ok(())
 }
 
+#[tauri::command]
+fn grok_open_releases() -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    let mut command = std::process::Command::new("explorer.exe");
+    #[cfg(target_os = "macos")]
+    let mut command = std::process::Command::new("open");
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    let mut command = std::process::Command::new("xdg-open");
+    command
+        .arg("https://github.com/cheer932041235/grok-workbench/releases")
+        .spawn()
+        .map_err(|e| format!("打开失败：{e}"))?;
+    Ok(())
+}
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _, _| {
@@ -39,6 +54,7 @@ pub fn run() {
             grok::grok_export,
             files::grok_preview_file,
             files::grok_open_file,
+            grok_open_releases,
             grok_quit
         ])
         .run(tauri::generate_context!())

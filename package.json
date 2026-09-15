@@ -1,6 +1,6 @@
 {
   "name": "grok-workbench",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Desktop visual workspace for Grok Build",
   "type": "module",
   "license": "Apache-2.0",

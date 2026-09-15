@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, tick, setContext } from "svelte";
+  import UpdateCheck from "../grok/UpdateCheck.svelte";
   import FilePreview from "../grok/FilePreview.svelte";
   import { filePreviewContext, type FileTarget, type OpenFile } from "../grok/file-links";
   let previewWidth = $state(480);
@@ -1198,6 +1199,7 @@
             }}
           /> 跟随最新输出</label
         >
+        <UpdateCheck openReleases={() => invoke("grok_open_releases")} />
         <details>
           <summary>连接日志（{diagnostics.length}）</summary>
           <pre>{diagnostics.join("\n") || "暂无日志"}</pre>
