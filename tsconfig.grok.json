@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "src/grok/**/*.ts",
+    "src/grok/**/*.svelte",
+    "src/routes/**/*.ts",
+    "src/routes/**/*.svelte",
+    "src/app.d.ts"
+  ],
+  "exclude": ["node_modules", "upstream"]
+}

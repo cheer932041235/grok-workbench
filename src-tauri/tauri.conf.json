@@ -1,0 +1,72 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nicegui/nicegui/main/.github/schemas/tauri-v2.json",
+  "productName": "Grok Workbench",
+  "version": "0.1.0",
+  "identifier": "com.grokworkbench.desktop",
+  "build": {
+    "frontendDist": "../build",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Grok Workbench",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 900,
+        "minHeight": 600,
+        "resizable": true,
+        "decorations": false,
+        "theme": "Dark",
+        "fullscreen": false,
+        "maximized": true,
+        "dragDropEnabled": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src ipc: http://ipc.localhost; font-src 'self' data:"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "category": "DeveloperTool",
+    "shortDescription": "Visual workspace for Grok Build",
+    "longDescription": "A desktop interface for Grok Build with readable conversations, tool activity and code changes. Based on OpenCovibe.",
+    "macOS": {
+      "entitlements": "entitlements.plist",
+      "minimumSystemVersion": "13.0"
+    },
+    "linux": {
+      "deb": {
+        "depends": [
+          "libwebkit2gtk-4.1-0",
+          "libgtk-3-0",
+          "libayatana-appindicator3-1 | libappindicator3-1",
+          "xclip | xsel"
+        ],
+        "recommends": [
+          "wl-clipboard",
+          "fonts-noto-cjk | fonts-wqy-microhei"
+        ]
+      }
+    },
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      },
+      "nsis": {
+        "installerIcon": "icons/icon.ico"
+      }
+    }
+  }
+}

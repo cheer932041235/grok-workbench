@@ -1,0 +1,35 @@
+import type { SessionRecord, Transcript } from "./protocol";
+import { toolText } from "./protocol";
+
+export function finishTools(transcript: Transcript): Transcript {
+  return {
+    ...transcript,
+    blocks: transcript.blocks.map((block) =>
+      block.type === "tool" && !["completed", "failed"].includes(block.tool.status ?? "")
+        ? { type: "tool", tool: { ...block.tool, status: "interrupted" } }
+        : block,
+    ),
+  };
+}
+
+export function exportMarkdown(record: SessionRecord): string {
+  return (
+    `# ${record.title}\n\n项目：${record.cwd}\n\n` +
+    record.blocks
+      .map((block) => {
+        if (block.type !== "tool")
+          return `## ${block.type === "user" ? "你" : block.type === "thought" ? "思考" : "Grok"}\n\n${block.text}`;
+        const tool = block.tool;
+        const content = (tool.content ?? [])
+          .map((item) => {
+            if (item.type === "diff")
+              return `文件：${item.path ?? ""}\n\n修改前：\n\n\`\`\`\n${item.oldText ?? ""}\n\`\`\`\n\n修改后：\n\n\`\`\`\n${item.newText ?? ""}\n\`\`\``;
+            return item.content?.text ?? item.text ?? "";
+          })
+          .filter(Boolean)
+          .join("\n\n");
+        return `## 工具：${tool.title ?? tool.kind ?? "工具调用"}\n\n${content || toolText(tool) || tool.status || ""}`;
+      })
+      .join("\n\n")
+  );
+}

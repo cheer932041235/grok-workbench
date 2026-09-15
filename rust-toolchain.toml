@@ -1,0 +1,3 @@
+# Build the desktop Rust bridge with the stable toolchain.
+[toolchain]
+channel = "stable"

@@ -1,0 +1,24 @@
+[package]
+name = "grok-workbench"
+version = "0.1.0"
+edition = "2021"
+description = "Desktop visual workspace for Grok Build"
+license = "Apache-2.0"
+
+[lib]
+name = "opencovibe_desktop_lib"
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[[bin]]
+name = "GrokWorkbench"
+path = "src/main.rs"
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-single-instance = "2"
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
