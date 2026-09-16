@@ -1,3 +1,4 @@
+mod billing;
 mod files;
 mod grok;
 mod history;
@@ -41,6 +42,7 @@ pub fn run() {
         .manage(grok::GrokState::default())
         .invoke_handler(tauri::generate_handler![
             grok::grok_version,
+            billing::grok_billing,
             grok::grok_connect,
             grok::grok_send,
             grok::grok_disconnect,

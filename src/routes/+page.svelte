@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, tick, setContext } from "svelte";
+  import UsagePanel from "../grok/UsagePanel.svelte";
   import UpdateCheck from "../grok/UpdateCheck.svelte";
   import FilePreview from "../grok/FilePreview.svelte";
   import { filePreviewContext, type FileTarget, type OpenFile } from "../grok/file-links";
@@ -66,7 +67,6 @@
   let draftImages = $state<PromptImage[]>([]);
   let unsentPrompt = $state<{ text: string; images: PromptImage[] } | undefined>();
   let imageLoading = $state(false);
-  let imageInput: HTMLInputElement;
   async function addImages(files: File[]) {
     if (imageLoading || switching || closing || managing) return;
     imageLoading = true;
@@ -120,8 +120,8 @@
   let error = $state("");
   let settings = $state(false);
   let search = $state("");
-  let filter = $state("all");
-  let fontSize = $state(18);
+  let filter = $state("answers");
+  let fontSize = $state(15);
   let lineHeight = $state(1.85);
   let focusMode = $state(false);
   let permissionMode = $state("bypassPermissions");
@@ -205,7 +205,7 @@
     readingEarlier = true;
     follow = false;
     outlinePopup = false;
-    if (filter === "tools") filter = "all";
+    if (filter === "tools") filter = "answers";
     await tick();
     if (selectedSession !== sessionId) return;
     const anchor = viewport?.querySelector<HTMLElement>(`[data-question-index="${index}"]`);
@@ -246,10 +246,6 @@
             ? block.type === "answer" || block.type === "user"
             : block.type === "tool"),
       ),
-  );
-  let tools = $derived(transcript.blocks.filter((b) => b.type === "tool"));
-  let completed = $derived(
-    tools.filter((b) => b.type === "tool" && b.tool.status === "completed").length,
   );
   let visibleHistory = $derived(
     history.filter(
@@ -549,7 +545,7 @@
       status = "未连接";
       error = "";
       notice = "";
-      filter = "all";
+      filter = "answers";
       await persist();
     } finally {
       switching = false;
@@ -880,7 +876,7 @@
     );
     cwd = localStorage.getItem("grok-workbench.cwd") ?? "";
     projectPath = cwd;
-    fontSize = Number(localStorage.getItem("grok-workbench.fontSize")) || 18;
+    fontSize = Number(localStorage.getItem("grok-workbench.fontSize")) || 15;
     lineHeight = Number(localStorage.getItem("grok-workbench.lineHeight")) || 1.85;
     focusMode = localStorage.getItem("grok-workbench.focusMode") === "true";
     permissionMode = localStorage.getItem("grok-workbench.permissionMode") || "bypassPermissions";
@@ -1100,10 +1096,8 @@
         </p>{/if}
     </div>
     <div class="sidebar-bottom">
-      <div class="local-label"><i></i> 本地工作台 <span>v0.2</span></div>
-      <button onclick={() => (settings = !settings)}>⚙ <span>连接与显示设置</span></button><small
-        >基于 OpenCovibe · Apache-2.0</small
-      >
+      <div class="local-label"><i></i> 本地工作台 <span>v0.2.5</span></div>
+      <button onclick={() => (settings = !settings)}>⚙ <span>连接与显示设置</span></button>
     </div>
   </aside>
   <PanelResize
@@ -1214,37 +1208,16 @@
       </div>{/if}
     <div class="conversation" bind:this={viewport} onscroll={conversationScrolled}>
       <div class="reading-column">
-        {#if !transcript.blocks.length}
-          <section class="welcome">
-            <div class="eyebrow"><span></span> GROK BUILD, IN FOCUS</div>
-            <div class="welcome-symbol">╱</div>
-            <h2>想法在这里，<br /><span>变成清晰的进展。</span></h2>
-            <p>
-              和 Grok 一起写代码。把思考、工具执行与文件修改，<br
-              />放进一个读得清、看得懂的工作空间。
-            </p>
-            <div class="suggestions">
-              <button onclick={() => (prompt = "先阅读这个项目，解释整体结构和启动方法。")}
-                ><span>▱</span><strong>读懂项目</strong><small>梳理结构与运行方式</small></button
-              ><button onclick={() => (prompt = "检查当前项目的问题，先说明发现和修改计划。")}
-                ><span>⌕</span><strong>定位问题</strong><small>从现象找到具体原因</small></button
-              ><button onclick={() => (prompt = "帮我实现一个功能：")}
-                ><span>＋</span><strong>实现想法</strong><small>从需求推进到代码</small></button
-              >
-            </div>
-            <div class="welcome-note">选择左侧项目文件夹，然后发送第一条任务</div>
-          </section>
-        {/if}
-        {#each transcript.subagents ?? [] as agent (agent.id)}<SubagentCard
-            {agent}
-            canManage={ready &&
-              !connecting &&
-              !switching &&
-              !closing &&
-              !managing &&
-              !configChanging}
-            manage={(action) => manageSubagent(agent.id, action)}
-          />{/each}
+        {#if filter !== "answers"}{#each transcript.subagents ?? [] as agent (agent.id)}<SubagentCard
+              {agent}
+              canManage={ready &&
+                !connecting &&
+                !switching &&
+                !closing &&
+                !managing &&
+                !configChanging}
+              manage={(action) => manageSubagent(agent.id, action)}
+            />{/each}{/if}
         {#key sessionId + ":" + filter}
           {#each visibleBlocks as { block, blockIndex } (blockIndex)}
             {#if block.type === "user"}<article
@@ -1374,18 +1347,8 @@
           {/each}
         </section>
       {/if}
+      <UsagePanel {executable} />
       <div class="composer">
-        <input
-          class="image-input"
-          type="file"
-          accept="image/png,image/jpeg,image/webp"
-          multiple
-          bind:this={imageInput}
-          onchange={(event) => {
-            void addImages(Array.from(event.currentTarget.files ?? []));
-            event.currentTarget.value = "";
-          }}
-        />
         {#if draftImages.length}<div class="draft-images">
             {#each draftImages as image, index}<div>
                 <img src={imageUrl(image)} alt={image.name} /><button
@@ -1426,16 +1389,10 @@
           oninput={inputChanged}
           onkeydown={keydown}
           placeholder={busy ? "继续输入下一条需求，按 Enter 加入队列…" : "告诉 Grok 你想做什么…"}
-          rows="3"
+          rows="2"
           disabled={!mounted || closing || imageLoading || managing || switching}
         ></textarea>
         <div class="composer-toolbar">
-          <button
-            class="attach-image"
-            disabled={imageLoading || managing || switching || closing || draftImages.length >= 4}
-            onclick={() => imageInput.click()}
-            title="添加图片，也可在输入框粘贴截图">{imageLoading ? "读取中…" : "＋ 图片"}</button
-          >
           <div class="model-options">
             <select
               aria-label="授权模式"
@@ -1484,14 +1441,9 @@
           </div>
         </div>
       </div>
-      <div class="composer-foot">
-        {#if hasPendingConfig}<span class="pending-config">设置待应用 · 下一条需求生效</span>{/if}
-        <span
-          >{permissionMode === "bypassPermissions"
-            ? "完全允许 · Grok 可直接执行命令和修改文件"
-            : "Grok CLI 执行任务 · Workbench 呈现过程"}</span
-        ><span>{sessionId ? "会话保存在本机" : "准备开始"}</span>
-      </div>
+      {#if hasPendingConfig}<div class="composer-foot">
+          <span class="pending-config">设置待应用 · 下一条需求生效</span>
+        </div>{/if}
     </div>
   </main>
   <PanelResize
@@ -1535,10 +1487,7 @@
         <small>当前状态</small><strong>{status}</strong>
         <p>{ready ? "已连接本机 Grok CLI" : "连接后实时展示执行进展"}</p>
       </div>
-      <div class="stats">
-        <div><strong>{tools.length}</strong><small>工具调用</small></div>
-        <div><strong>{completed}</strong><small>已完成</small></div>
-      </div>
+
       <div class="inspector-label">执行计划</div>
       {#if transcript.plan.length}<ol class="plan">
           {#each transcript.plan as step}<li class:done={step.status === "completed"}>

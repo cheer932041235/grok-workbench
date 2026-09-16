@@ -670,8 +670,8 @@ header {
 }
 .composer textarea {
   resize: vertical;
-  min-height: 75px;
-  max-height: 220px;
+  min-height: 54px;
+  max-height: 160px;
   background: transparent;
   border: 0;
   outline: none !important;
@@ -1107,7 +1107,7 @@ header {
   line-height: var(--reading-line-height);
 }
 .composer textarea {
-  font-size: var(--reading-size);
+  font-size: 14px;
 }
 .thought {
   font-size: calc(var(--reading-size) - 1px);
@@ -1158,7 +1158,7 @@ header {
 
 .prompt-queue {
   max-width: 940px;
-  max-height: 220px;
+  max-height: 160px;
   overflow: auto;
   margin: 0 auto 8px;
   padding: 7px 12px;
