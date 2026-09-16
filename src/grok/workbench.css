@@ -1116,14 +1116,14 @@ header {
   color: #b9c3b6;
 }
 .tool-card {
-  font-size: max(14px, calc(var(--reading-size) - 2px));
+  font-size: max(11px, calc(var(--reading-size) - 2px));
 }
 .rich-text pre,
 .tool-output,
 .raw pre,
 .diff {
   font-family: Consolas, "Microsoft YaHei UI", monospace;
-  font-size: max(13px, calc(var(--reading-size) - 2px));
+  font-size: max(11px, calc(var(--reading-size) - 2px));
   line-height: var(--reading-line-height);
 }
 .rich-text pre code {
@@ -1481,4 +1481,34 @@ header {
 .outline-popup header button {
   padding: 4px 9px;
   font-size: 20px;
+}
+
+/* Compact conversation toolbar: the sidebar owns project and session titles. */
+main > .compact-toolbar {
+  height: auto;
+  min-height: 40px;
+  padding: 4px 16px;
+  gap: 8px;
+}
+.compact-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #9299a4;
+  font-size: 12px;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.compact-toolbar .view-controls {
+  justify-content: flex-end;
+  margin-left: auto;
+  min-width: 0;
+  flex-shrink: 1;
+  gap: 2px;
+}
+.compact-toolbar .view-controls button {
+  font-size: 12px;
+  padding: 4px 6px;
 }

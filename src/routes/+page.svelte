@@ -615,7 +615,7 @@
     }
   }
   function resizeText(delta: number) {
-    fontSize = Math.max(13, Math.min(22, fontSize + delta));
+    fontSize = Math.max(11, Math.min(22, fontSize + delta));
     localStorage.setItem("grok-workbench.fontSize", String(fontSize));
   }
   function connect(): Promise<void> {
@@ -1096,7 +1096,7 @@
         </p>{/if}
     </div>
     <div class="sidebar-bottom">
-      <div class="local-label"><i></i> 本地工作台 <span>v0.2.5</span></div>
+      <div class="local-label"><i></i> 本地工作台 <span>v0.2.6</span></div>
       <button onclick={() => (settings = !settings)}>⚙ <span>连接与显示设置</span></button>
     </div>
   </aside>
@@ -1108,23 +1108,12 @@
     onresize={(value, save) => resizePanel("left", value, save)}
   />
   <main>
-    <header>
-      <div class="breadcrumb">工作台 <span>/</span> {projectName}</div>
-      <div class="header-right">
-        <span class="connection" class:online={ready}><i></i>{version || "Grok Build"}</span><button
-          class="icon-button"
-          title="导出当前会话"
-          disabled={!transcript.blocks.length}
-          onclick={exportChat}>导出 ↗</button
-        >
-      </div>
-    </header>
-    <div class="session-bar">
-      <div>
-        <h1>{title}</h1>
-        {#if archived}<small class="muted">已归档 · 发送新需求会恢复此会话</small>{/if}
-        <p><span class="status-dot" class:pulse={busy || connecting}></span>{status}</p>
-      </div>
+    <header class="compact-toolbar" aria-label="会话工具栏">
+      <span class="compact-status" title={`${title} · ${version || "Grok Build"}`}
+        ><span class="status-dot" class:pulse={busy || connecting}></span>{archived
+          ? "已归档"
+          : status}</span
+      >
       <div class="view-controls">
         <button
           class="outline-toggle"
@@ -1138,16 +1127,27 @@
             saveDisplay();
           }}>专注</button
         >
-        <button onclick={() => resizeText(-1)} title="缩小文字">A−</button><button
+        <button
+          disabled={fontSize <= 11}
+          onclick={() => resizeText(-1)}
+          title={`缩小文字（当前 ${fontSize}px，最小 11px）`}>A−</button
+        ><button
           onclick={() => resizeText(1)}
-          title="放大文字">A＋</button
+          disabled={fontSize >= 22}
+          title={`放大文字（当前 ${fontSize}px）`}>A＋</button
         ><span></span><button class:chosen={filter === "all"} onclick={() => (filter = "all")}
           >全部</button
         ><button class:chosen={filter === "answers"} onclick={() => (filter = "answers")}
           >回答</button
         ><button class:chosen={filter === "tools"} onclick={() => (filter = "tools")}>工具</button>
+        <button
+          class="icon-button"
+          title="导出当前会话"
+          disabled={!transcript.blocks.length}
+          onclick={exportChat}>导出 ↗</button
+        >
       </div>
-    </div>
+    </header>
     {#if settings}<section class="settings-panel">
         <div>
           <h2>连接与显示设置</h2>
