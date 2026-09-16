@@ -6,7 +6,7 @@
 
 [**下载 Windows 安装包**](https://github.com/cheer932041235/grok-workbench/releases/download/v0.2.4/GrokWorkbench_0.2.4_x64-setup.exe) · [使用指南](docs/guide.md) · [参与贡献](CONTRIBUTING.md) · [反馈问题](https://github.com/cheer932041235/grok-workbench/issues)
 
-**0.2.7 · 早期预览 · Windows x64**。需要单独安装并登录 Grok Build CLI；已联调版本为 1.0.25。
+**0.2.8 · 早期预览 · Windows x64**。需要单独安装并登录 Grok Build CLI；已联调版本为 1.0.25。
 
 ![Grok Workbench 中的公式与代码阅读界面](docs/images/reading.png)
 
@@ -16,7 +16,7 @@
 
 **看清回答。** Markdown、代码高亮、表格和 LaTeX 公式随输出更新。思考过程与工具详情可以折叠，宽公式和长代码在自己的区域内滚动。
 
-**点开文件。** 点击回答里的本地文件链接或路径，在右侧预览 PDF、图片、视频、Markdown、公式与代码。反引号内的文件路径也能点击；视频支持播放和进度跳转，带行号的链接可定位源码，聊天输入保持可用。相对路径按当前会话工作目录解析；视频编码需受系统 WebView 支持。
+**点开文件。** 点击回答里的本地文件链接或路径，在右侧预览 PDF、图片、视频、Markdown、公式与代码。反引号内的文件路径也能点击；视频支持播放和进度跳转，带行号的链接可定位源码，聊天输入保持可用。相对路径优先按当前会话工作目录解析，缺失时依据会话路径和提到的 Skill 目录补全；多个匹配会列出供选择。视频编码需受系统 WebView 支持。
 
 **把下一步先写下来。** 回答期间继续输入需求，按顺序排队执行。待执行需求可以编辑、删除、上移，也可以暂停整个队列。
 

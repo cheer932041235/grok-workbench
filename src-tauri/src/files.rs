@@ -22,6 +22,63 @@ fn resolve(path: &str, cwd: &str) -> Result<PathBuf, String> {
     fs::canonicalize(full).map_err(|e| format!("无法打开文件：{e}"))
 }
 
+// Complete only against directories evidenced in this conversation.
+fn candidates(path: &str, cwd: &str, context: &Value, skill_roots: &[PathBuf]) -> Vec<PathBuf> {
+    if let Ok(found) = resolve(path, cwd) {
+        return vec![found];
+    }
+    if Path::new(path).is_absolute() || path.starts_with("\\\\") || path.starts_with("//") {
+        return vec![];
+    }
+    let relative = path.replace('\\', "/");
+    let mut found = Vec::new();
+    let mut add = |candidate: PathBuf| {
+        if candidate.is_file() {
+            if let Ok(full) = fs::canonicalize(candidate) {
+                if !found.contains(&full) {
+                    found.push(full);
+                }
+            }
+        }
+    };
+    if let Some(paths) = context["paths"].as_array() {
+        for item in paths.iter().filter_map(Value::as_str) {
+            let known = Path::new(item);
+            if !known.is_absolute() {
+                continue;
+            }
+            if item.replace('\\', "/").ends_with(&format!("/{relative}")) {
+                add(known.to_path_buf());
+            }
+            let directory = if known.is_dir() {
+                Some(known)
+            } else {
+                known.parent()
+            };
+            if let Some(directory) = directory {
+                // Stop before disk/home roots; do not search the disk recursively.
+                for ancestor in directory.ancestors().take(6) {
+                    if ancestor.components().count() < 3 {
+                        break;
+                    }
+                    add(ancestor.join(&relative));
+                }
+            }
+        }
+    }
+    if let Some(skills) = context["skills"].as_array() {
+        for name in skills.iter().filter_map(Value::as_str) {
+            if !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') {
+                continue;
+            }
+            for root in skill_roots {
+                add(root.join(name).join(&relative));
+            }
+        }
+    }
+    found
+}
+
 fn preview(path: &str, cwd: &str) -> Result<Value, String> {
     let path = resolve(path, cwd)?;
     let metadata = fs::metadata(&path).map_err(|e| e.to_string())?;
@@ -139,10 +196,36 @@ pub async fn grok_preview_file(
     app: tauri::AppHandle,
     path: String,
     cwd: String,
+    context: Option<Value>,
 ) -> Result<Value, String> {
-    let value = tauri::async_runtime::spawn_blocking(move || preview(&path, &cwd))
-        .await
-        .map_err(|e| e.to_string())??;
+    let value = tauri::async_runtime::spawn_blocking(move || {
+        let mut roots = Vec::new();
+        if let Some(home) = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" }) {
+            let home = PathBuf::from(home);
+            for folder in [".codex/skills", ".agents/skills", ".grok/skills"] {
+                roots.push(home.join(folder));
+            }
+        }
+        let matches = candidates(&path, &cwd, &context.unwrap_or(Value::Null), &roots);
+        if matches.len() > 1 {
+            let names: Vec<String> = matches
+                .iter()
+                .map(|p| {
+                    p.to_string_lossy()
+                        .trim_start_matches("\\\\?\\")
+                        .to_string()
+                })
+                .collect();
+            return Ok(json!({"kind":"choices", "path":path, "name":path, "extension":"", "candidates":names}));
+        }
+        if let Some(found) = matches.first() {
+            preview(found.to_string_lossy().trim_start_matches("\\\\?\\"), &cwd)
+        } else {
+            preview(&path, &cwd)
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())??;
     if matches!(value["kind"].as_str(), Some("pdf" | "video" | "audio")) {
         app.asset_protocol_scope()
             .allow_file(value["path"].as_str().ok_or("文件路径缺失")?)
@@ -215,6 +298,54 @@ pub async fn grok_open_file(path: String, cwd: String, folder: bool) -> Result<(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn completion_prefers_cwd_and_lists_ambiguous_matches() {
+        let root = std::env::temp_dir().join("grok-path-completion-test");
+        let cwd = root.join("cwd");
+        let skills = root.join("skills");
+        for folder in [
+            cwd.join("references"),
+            skills.join("talking-head-local/references"),
+            skills.join("other-skill/references"),
+        ] {
+            fs::create_dir_all(folder).unwrap();
+        }
+        let relative = "references/demo.md";
+        let skill_file = skills.join("talking-head-local").join(relative);
+        fs::write(&skill_file, "skill").unwrap();
+        let context = json!({"skills":["talking-head-local", "other-skill"]});
+        assert_eq!(
+            candidates(
+                relative,
+                cwd.to_str().unwrap(),
+                &context,
+                std::slice::from_ref(&skills)
+            ),
+            vec![fs::canonicalize(&skill_file).unwrap()]
+        );
+        fs::write(skills.join("other-skill").join(relative), "other").unwrap();
+        assert_eq!(
+            candidates(
+                relative,
+                cwd.to_str().unwrap(),
+                &context,
+                std::slice::from_ref(&skills)
+            )
+            .len(),
+            2
+        );
+        fs::write(cwd.join(relative), "local").unwrap();
+        assert_eq!(
+            candidates(relative, cwd.to_str().unwrap(), &context, &[]),
+            vec![fs::canonicalize(cwd.join(relative)).unwrap()]
+        );
+        assert!(candidates("missing.md", cwd.to_str().unwrap(), &context, &[]).is_empty());
+        assert_eq!(
+            candidates(relative, "", &json!({"paths":[skill_file]}), &[]).len(),
+            1
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
     #[test]
     fn local_preview_handles_unicode_missing_binary_and_size() {
         let root = std::env::temp_dir().join(format!("grok-preview-test-{}", std::process::id()));

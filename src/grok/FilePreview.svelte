@@ -10,8 +10,15 @@
     target,
     cwd,
     onclose,
+    context,
     width = $bindable(480),
-  }: { target: FileTarget; cwd: string; onclose: () => void; width?: number } = $props();
+  }: {
+    target: FileTarget;
+    cwd: string;
+    onclose: () => void;
+    width?: number;
+    context: { paths: string[]; skills: string[] };
+  } = $props();
   type Preview = {
     path: string;
     name: string;
@@ -21,6 +28,7 @@
     bytes?: number[];
     mime?: string;
     reason?: string;
+    candidates?: string[];
   };
   let data = $state<Preview>();
   let error = $state("");
@@ -83,7 +91,7 @@
     notice = "";
     raw = Boolean(selected.line);
     zoom = 100;
-    invoke<Preview>("grok_preview_file", { path: selected.path, cwd: directory })
+    invoke<Preview>("grok_preview_file", { path: selected.path, cwd: directory, context })
       .then(async (value) => {
         if (!active) return;
         data = value;
@@ -153,6 +161,12 @@
   <div class="file-content" bind:this={content}>
     {#if loading}<p role="status">正在读取文件…</p>
     {:else if error}<p role="alert">{error}</p>
+    {:else if data?.kind === "choices"}
+      <p>找到多个匹配文件，请选择要预览的路径：</p>
+      {#each data.candidates ?? [] as candidate}<button
+          class="candidate"
+          onclick={() => (target = { ...target, path: candidate })}>{candidate}</button
+        >{/each}
     {:else if data?.kind === "image"}<img src={imageSrc} alt={data.name} style:width={`${zoom}%`} />
     {:else if data?.kind === "pdf"}
       <iframe class="pdf-preview" src={mediaSrc} title={data.name}></iframe>
@@ -279,6 +293,13 @@
   audio {
     width: 100%;
     max-height: 100%;
+  }
+  .candidate {
+    display: block;
+    width: 100%;
+    text-align: left;
+    overflow-wrap: anywhere;
+    margin-bottom: 10px;
   }
   .source {
     display: flex;

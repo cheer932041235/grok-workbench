@@ -4,10 +4,15 @@
   import UpdateCheck from "../grok/UpdateCheck.svelte";
   import FilePreview from "../grok/FilePreview.svelte";
   import { filePreviewContext, type FileTarget, type OpenFile } from "../grok/file-links";
+  import { previewContext } from "../grok/preview-context";
   let previewWidth = $state(480);
-  let preview = $state<{ target: FileTarget; cwd: string }>();
+  let preview = $state<{
+    target: FileTarget;
+    cwd: string;
+    context: ReturnType<typeof previewContext>;
+  }>();
   setContext<OpenFile>(filePreviewContext, (target, base) => {
-    preview = { target, cwd: base ?? cwd };
+    preview = { target, cwd: base ?? cwd, context: previewContext(transcript.blocks) };
   });
   import { invoke, isTauri } from "@tauri-apps/api/core";
   import { open, save } from "@tauri-apps/plugin-dialog";
@@ -1096,7 +1101,7 @@
         </p>{/if}
     </div>
     <div class="sidebar-bottom">
-      <div class="local-label"><i></i> 本地工作台 <span>v0.2.7</span></div>
+      <div class="local-label"><i></i> 本地工作台 <span>v0.2.8</span></div>
       <button onclick={() => (settings = !settings)}>⚙ <span>连接与显示设置</span></button>
     </div>
   </aside>
@@ -1457,6 +1462,7 @@
       bind:width={previewWidth}
       target={preview.target}
       cwd={preview.cwd}
+      context={preview.context}
       onclose={() => (preview = undefined)}
     />{/if}
   {#if outlinePopup}<aside class="outline-popup" aria-label="浮动对话目录">
