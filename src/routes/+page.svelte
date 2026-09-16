@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, tick, setContext } from "svelte";
+  import SessionBrowser from "../grok/SessionBrowser.svelte";
   import UsagePanel from "../grok/UsagePanel.svelte";
   import UpdateCheck from "../grok/UpdateCheck.svelte";
   import FilePreview from "../grok/FilePreview.svelte";
@@ -14,9 +15,9 @@
   setContext<OpenFile>(filePreviewContext, (target, base, source) => {
     preview = {
       target,
-      cwd: base ?? cwd,
+      cwd: base ?? browsing?.cwd ?? cwd,
       context: {
-        ...previewContext(transcript.blocks),
+        ...previewContext(browsing?.blocks ?? transcript.blocks),
         related: previewContext([{ type: "answer", text: source ?? "" }]).paths,
       },
     };
@@ -296,7 +297,7 @@
     localStorage.setItem("grok-workbench.activeSession", sessionId);
     if (!sessionId) {
       localStorage.setItem("grok-workbench.newDraft", prompt);
-      const draft = { text: prompt, images: [...draftImages], unsentPrompt };
+      const draft = { text: prompt, images: [...draftImages], unsentPrompt, cwd };
       saveQueue = saveQueue.catch(() => {}).then(() => invoke<void>("grok_save_draft", { draft }));
       return saveQueue;
     }
@@ -342,6 +343,107 @@
       );
     },
   );
+  let browsing = $state<StoredSession>();
+  let browseTimer: ReturnType<typeof setTimeout> | undefined;
+  let browseImageLoading = $state(false);
+  let browseError = $state("");
+  const executionLocked = $derived(busy || connecting || configChanging);
+  function saveBrowsing() {
+    clearTimeout(browseTimer);
+    if (!browsing) return saveQueue;
+    const snapshot = {
+      sessionId: browsing.sessionId,
+      draft: browsing.draft,
+      draftImages: JSON.parse(JSON.stringify(browsing.draftImages ?? [])),
+      cwd: browsing.cwd,
+    };
+    saveQueue = saveQueue
+      .catch(() => {})
+      .then(() =>
+        snapshot.sessionId
+          ? invoke<void>("grok_save_session_draft", {
+              sessionId: snapshot.sessionId,
+              text: snapshot.draft ?? "",
+              images: snapshot.draftImages ?? [],
+            })
+          : invoke<void>("grok_save_draft", {
+              draft: {
+                text: snapshot.draft ?? "",
+                images: snapshot.draftImages ?? [],
+                cwd: snapshot.cwd,
+              },
+            }),
+      );
+    return saveQueue;
+  }
+  function browsingChanged() {
+    clearTimeout(browseTimer);
+    browseTimer = setTimeout(() => {
+      void saveBrowsing().catch((e) => (browseError = String(e)));
+    }, 600);
+  }
+  async function browse(item?: HistorySummary, directory?: string) {
+    if (switching || closing || imageLoading || browseImageLoading) return;
+    switching = true;
+    try {
+      await saveBrowsing();
+      browseError = "";
+      if (item?.sessionId === sessionId) {
+        browsing = undefined;
+        preview = undefined;
+        return;
+      }
+      if (item) browsing = await readSession(item.sessionId);
+      else {
+        const draft = await invoke<{ text: string; images: PromptImage[]; cwd?: string } | null>(
+          "grok_load_draft",
+        );
+        browsing = {
+          sessionId: "",
+          title: "新会话草稿",
+          cwd: directory ?? draft?.cwd ?? cwd,
+          updatedAt: new Date().toISOString(),
+          blocks: [],
+          plan: [],
+          draft: draft?.text ?? "",
+          draftImages: draft?.images ?? [],
+        };
+      }
+      preview = undefined;
+      outlinePopup = false;
+    } catch (e) {
+      browseError = String(e);
+    } finally {
+      switching = false;
+    }
+  }
+  async function returnExecution() {
+    if (browseImageLoading) return;
+    await saveBrowsing();
+    browsing = undefined;
+    preview = undefined;
+  }
+  async function continueBrowsing() {
+    if (!browsing || executionLocked || switching || browseImageLoading) return;
+    await saveBrowsing();
+    const selected = browsing;
+    if (selected.sessionId) await load(historySummary(selected));
+    else {
+      await fresh();
+      cwd = selected.cwd;
+      projectPath = cwd;
+    }
+    if (!error) browsing = undefined;
+  }
+  async function browseFolder() {
+    if (browseImageLoading || switching || closing) return;
+    const folder = await open({ directory: true, multiple: false, title: "选择新会话工作目录" });
+    if (typeof folder === "string") {
+      if (browsing && !browsing.sessionId) browsing.cwd = folder;
+      else await browse(undefined, folder);
+      await saveBrowsing();
+    }
+  }
   async function readSession(id: string): Promise<StoredSession> {
     const raw = await invoke<StoredSession>("grok_load", { sessionId: id });
     const saved = materializeHistory(raw);
@@ -382,26 +484,44 @@
     const draft = await invoke<{
       text: string;
       images: PromptImage[];
+      cwd?: string;
       unsentPrompt?: { text: string; images: PromptImage[] };
     } | null>("grok_load_draft");
     prompt = draft?.text ?? localStorage.getItem("grok-workbench.newDraft") ?? "";
     draftImages = draft?.images ?? [];
     unsentPrompt = draft?.unsentPrompt;
+    if (draft?.cwd) {
+      cwd = draft.cwd;
+      projectPath = cwd;
+    }
   }
   async function manageHistory(
     item: HistorySummary,
     patch: { title?: string; archived?: boolean },
   ) {
-    if (busy || connecting || switching || configChanging || closing || managing || imageLoading)
+    if (
+      switching ||
+      closing ||
+      managing ||
+      imageLoading ||
+      browseImageLoading ||
+      (patch.archived === true && item.sessionId === sessionId && executionLocked)
+    )
       return;
     managing = true;
     try {
       clearTimeout(saveTimer);
       saveTimer = undefined;
       await persist();
-      const current = await readSession(item.sessionId);
+      await saveBrowsing();
+      const current = item.sessionId === sessionId ? record() : await readSession(item.sessionId);
       const updated = JSON.parse(JSON.stringify({ ...current, ...patch })) as SessionRecord;
-      await invoke("grok_save", { record: updated });
+      if (item.sessionId === sessionId) {
+        title = updated.title;
+        archived = Boolean(updated.archived);
+        await persist();
+      } else await invoke("grok_save", { record: updated });
+      if (browsing?.sessionId === item.sessionId) browsing = { ...browsing, ...patch };
       history = history.map((h) => (h.sessionId === item.sessionId ? historySummary(updated) : h));
       if (item.sessionId === sessionId) {
         sessionSaver.remember(updated);
@@ -497,6 +617,10 @@
     }
   }
   async function chooseFolder() {
+    if (executionLocked || browsing) {
+      await browseFolder();
+      return;
+    }
     try {
       const selected = await open({
         directory: true,
@@ -523,6 +647,11 @@
     }
   }
   async function fresh(fromArchive = false) {
+    if (browseImageLoading) return;
+    if (executionLocked) {
+      await browse();
+      return;
+    }
     if (
       imageLoading ||
       switching ||
@@ -537,8 +666,10 @@
     try {
       clearTimeout(saveTimer);
       saveTimer = undefined;
+      await saveBrowsing();
       await persist();
       if (client) await client.disconnect();
+      browsing = undefined;
       ready = false;
       sessionId = "";
       recordSource = undefined;
@@ -564,13 +695,21 @@
     }
   }
   async function load(item: HistorySummary) {
-    if (item.sessionId === sessionId) return;
+    if (executionLocked) {
+      await browse(item);
+      return;
+    }
+    if (item.sessionId === sessionId) {
+      await returnExecution();
+      return;
+    }
     if (imageLoading || switching || busy || connecting || configChanging || closing || managing)
       return;
     switching = true;
     try {
       clearTimeout(saveTimer);
       saveTimer = undefined;
+      await saveBrowsing();
       await persist();
       const saved = await readSession(item.sessionId);
       await client.disconnect();
@@ -595,6 +734,7 @@
       editingQueueId = null;
       options = [];
       permissions = [];
+      browsing = undefined;
       status = "历史会话 · 可继续";
       error = "";
       notice = "";
@@ -641,6 +781,7 @@
   async function establishConnection() {
     if (ready) return;
     if (!cwd.trim()) throw new Error("请先选择项目文件夹");
+    const startingNewSession = !sessionId;
     connecting = true;
     status = "正在连接 Grok…";
     try {
@@ -666,7 +807,8 @@
       localStorage.setItem("grok-workbench.cwd", cwd);
       await persist();
       unsentPrompt = undefined;
-      await invoke("grok_save_draft", { draft: { text: "", images: [] } });
+      if (startingNewSession && (!browsing || browsing.sessionId))
+        await invoke("grok_save_draft", { draft: { text: "", images: [] } });
     } catch (e) {
       ready = false;
       await client.disconnect();
@@ -920,7 +1062,7 @@
       unlistenClose = await getCurrentWindow().onCloseRequested(async (event) => {
         event.preventDefault();
         if (closing) return;
-        if (imageLoading) {
+        if (imageLoading || browseImageLoading) {
           notice = "正在读取图片，请稍后关闭窗口";
           return;
         }
@@ -929,6 +1071,7 @@
         try {
           clearTimeout(saveTimer);
           saveTimer = undefined;
+          await saveBrowsing();
           await persist();
           await invoke("grok_quit");
         } catch (e) {
@@ -979,6 +1122,7 @@
       disposed = true;
       clearTimeout(saveTimer);
       clearTimeout(draftTimer);
+      clearTimeout(browseTimer);
       cancelAnimationFrame(outlineFrame);
       unlistenClose?.();
       client.dispose();
@@ -997,6 +1141,7 @@
 
 <div
   class="workbench"
+  class:browsing={Boolean(browsing)}
   class:focus-mode={focusMode}
   class:preview-open={Boolean(preview)}
   style:--preview-width={`${Math.min(previewWidth, windowWidth - (windowWidth > 1300 ? 960 : 460))}px`}
@@ -1009,13 +1154,13 @@
     </div>
     <button
       class="new-session"
-      disabled={busy || connecting || switching || managing || !mounted}
+      disabled={switching || managing || closing || !mounted}
       onclick={() => fresh().catch(report)}><span>＋</span> 新建会话 <kbd>NEW</kbd></button
     >
     <div class="sidebar-label">工作目录</div>
     <button
       class="project"
-      disabled={busy || connecting || switching || !mounted}
+      disabled={switching || closing || !mounted}
       onclick={chooseFolder}
       title={cwd}
       ><span>▱</span>
@@ -1063,11 +1208,15 @@
       {#each visibleHistory as item (item.sessionId)}<div class="history-entry">
           <button
             class="history-open"
-            class:active={item.sessionId === sessionId}
-            disabled={busy || connecting || switching || managing}
+            class:active={item.sessionId === (browsing?.sessionId ?? sessionId)}
+            disabled={switching || managing || closing}
             title={item.title}
-            onclick={() => load(item)}
-            ><span>{item.title}</span><small
+            onclick={() => (executionLocked || browsing ? browse(item) : load(item))}
+            ><span
+              >{item.title}{item.sessionId === sessionId && executionLocked
+                ? " · 运行中"
+                : ""}</span
+            ><small
               >{item.cwd.split(/[\\/]/).at(-1)} · {new Date(item.updatedAt).toLocaleDateString(
                 "zh-CN",
                 { month: "short", day: "numeric" },
@@ -1089,14 +1238,20 @@
           {:else}
             <div class="history-actions">
               <button
-                disabled={busy || connecting || switching || configChanging || managing}
+                disabled={switching || managing || closing}
                 onclick={() => {
                   renamingId = item.sessionId;
                   renameText = item.title;
                 }}>重命名</button
               >
               <button
-                disabled={busy || connecting || switching || configChanging || managing}
+                disabled={switching ||
+                  managing ||
+                  closing ||
+                  (item.sessionId === sessionId && executionLocked)}
+                title={item.sessionId === sessionId && executionLocked
+                  ? "当前会话执行结束后可归档"
+                  : ""}
                 onclick={() => manageHistory(item, { archived: !item.archived })}
                 >{item.archived ? "恢复" : "归档"}</button
               >
@@ -1108,7 +1263,7 @@
         </p>{/if}
     </div>
     <div class="sidebar-bottom">
-      <div class="local-label"><i></i> 本地工作台 <span>v0.2.9</span></div>
+      <div class="local-label"><i></i> 本地工作台 <span>v0.2.10</span></div>
       <button onclick={() => (settings = !settings)}>⚙ <span>连接与显示设置</span></button>
     </div>
   </aside>
@@ -1119,6 +1274,21 @@
     max={leftMax}
     onresize={(value, save) => resizePanel("left", value, save)}
   />
+  {#if browsing}
+    <SessionBrowser
+      bind:record={browsing}
+      running={executionLocked}
+      executionStatus={permissions.length || interactions.length
+        ? "等待你的回应，请返回执行会话"
+        : status}
+      onback={() => returnExecution().catch((e) => (browseError = String(e)))}
+      oncontinue={() => continueBrowsing().catch((e) => (browseError = String(e)))}
+      onreading={(value) => (browseImageLoading = value)}
+      onsave={browsingChanged}
+      onchangefolder={() => browseFolder().catch((e) => (browseError = String(e)))}
+    />
+    {#if browseError}<div class="browse-error" role="alert">{browseError}</div>{/if}
+  {/if}
   <main>
     <header class="compact-toolbar" aria-label="会话工具栏">
       <span class="compact-status" title={`${title} · ${version || "Grok Build"}`}

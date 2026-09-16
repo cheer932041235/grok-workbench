@@ -4,9 +4,9 @@
 
 为 Grok Build 设计的桌面工作台。阅读流式回答与公式，带图提问，连续安排需求，再把完成的对话归档。
 
-[**下载 Windows 安装包**](https://github.com/cheer932041235/grok-workbench/releases/download/v0.2.9/GrokWorkbench_0.2.9_x64-setup.exe) · [使用指南](docs/guide.md) · [参与贡献](CONTRIBUTING.md) · [反馈问题](https://github.com/cheer932041235/grok-workbench/issues)
+[**下载 Windows 安装包**](https://github.com/cheer932041235/grok-workbench/releases/download/v0.2.10/GrokWorkbench_0.2.10_x64-setup.exe) · [使用指南](docs/guide.md) · [参与贡献](CONTRIBUTING.md) · [反馈问题](https://github.com/cheer932041235/grok-workbench/issues)
 
-**0.2.9 · 早期预览 · Windows x64**。需要单独安装并登录 Grok Build CLI；已联调版本为 1.0.25。
+**0.2.10 · 早期预览 · Windows x64**。需要单独安装并登录 Grok Build CLI；已联调版本为 1.0.25。
 
 ![Grok Workbench 中的公式与代码阅读界面](docs/images/reading.png)
 
@@ -20,7 +20,7 @@
 
 **把下一步先写下来。** 回答期间继续输入需求，按顺序排队执行。待执行需求可以编辑、删除、上移，也可以暂停整个队列。
 
-**让对话有去处。** 未归档对话留在左侧。完成后归档，需要时再打开或恢复；每条会话可以重命名，并保存自己的草稿。
+**让对话有去处。** 未归档对话留在左侧。完成后归档，需要时再打开或恢复；每条会话可以重命名，并保存自己的草稿。任务执行中也能浏览其他历史、准备新会话；后台执行和排队继续保留在原会话。
 
 | 你想做的事 | 工作台提供的操作 |
 | --- | --- |
@@ -52,7 +52,7 @@
 ## 三步开始
 
 1. 按 [Grok Build 官方说明](https://github.com/xai-org/grok-build#installing-the-released-binary) 安装 CLI，在终端运行 `grok` 完成登录。
-2. [下载安装包](https://github.com/cheer932041235/grok-workbench/releases/download/v0.2.9/GrokWorkbench_0.2.9_x64-setup.exe)，从开始菜单打开 Grok Workbench。
+2. [下载安装包](https://github.com/cheer932041235/grok-workbench/releases/download/v0.2.10/GrokWorkbench_0.2.10_x64-setup.exe)，从开始菜单打开 Grok Workbench。
 3. 选择项目文件夹，检查授权模式，发送第一条需求。找不到 CLI 时，在设置中填写 `grok.exe` 的完整路径。
 
 安装版不需要 Node.js 或 Rust。系统缺少 WebView2 时，安装程序需要联网获取运行时。

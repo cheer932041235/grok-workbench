@@ -64,9 +64,17 @@ pub fn save(dir: &Path, record: &Value) -> Result<(), String> {
 }
 
 /// Typing sends only draft text over IPC; transcript parsing/writing runs off the UI thread.
-pub fn save_session_draft(dir: &Path, id: &str, text: &str) -> Result<(), String> {
+pub fn save_session_draft(
+    dir: &Path,
+    id: &str,
+    text: &str,
+    images: Option<Value>,
+) -> Result<(), String> {
     let mut record = load_record(dir, id)?;
     record["draft"] = json!(text);
+    if let Some(images) = images {
+        record["draftImages"] = images;
+    }
     save(dir, &record)
 }
 
@@ -189,12 +197,34 @@ mod tests {
         original["archived"] = json!(true);
         original["draftImages"] = json!([{"name":"draft.png","data":"example"}]);
         save(&dir, &original).unwrap();
-        save_session_draft(&dir, "session-1", "中文输入草稿").unwrap();
+        save_session_draft(&dir, "session-1", "中文输入草稿", None).unwrap();
         let mut expected = original;
         expected["draft"] = json!("中文输入草稿");
         assert_eq!(load_record(&dir, "session-1").unwrap(), expected);
-        save_session_draft(&dir, "session-1", "").unwrap();
+        save_session_draft(&dir, "session-1", "", None).unwrap();
         assert_eq!(load_record(&dir, "session-1").unwrap()["draft"], "");
+        clean_test_dir(&dir);
+    }
+
+    #[test]
+    fn browsing_draft_images_do_not_change_the_running_record() {
+        let dir = test_dir();
+        let running = record();
+        save(&dir, &running).unwrap();
+        let mut browsing = record();
+        browsing["sessionId"] = json!("session-2");
+        save(&dir, &browsing).unwrap();
+        let images = json!([{"name":"pasted.png","data":"image","mimeType":"image/png"}]);
+        save_session_draft(&dir, "session-2", "next request", Some(images.clone())).unwrap();
+        browsing["draft"] = json!("next request");
+        browsing["draftImages"] = images;
+        assert_eq!(load_record(&dir, "session-2").unwrap(), browsing);
+        assert_eq!(load_record(&dir, "session-1").unwrap(), running);
+        save_session_draft(&dir, "session-2", "", Some(json!([]))).unwrap();
+        assert_eq!(
+            load_record(&dir, "session-2").unwrap()["draftImages"],
+            json!([])
+        );
         clean_test_dir(&dir);
     }
 

@@ -219,10 +219,11 @@ pub async fn grok_save_session_draft(
     app: tauri::AppHandle,
     session_id: String,
     text: String,
+    images: Option<Value>,
 ) -> Result<(), String> {
     let dir = history_dir(&app)?;
     tauri::async_runtime::spawn_blocking(move || {
-        crate::history::save_session_draft(&dir, &session_id, &text)
+        crate::history::save_session_draft(&dir, &session_id, &text, images)
     })
     .await
     .map_err(|e| e.to_string())?

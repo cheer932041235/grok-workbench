@@ -1522,3 +1522,29 @@ main > .compact-toolbar {
 .rich-text a[data-local-file] code {
   color: inherit;
 }
+
+.workbench.browsing > main,
+.workbench.browsing > .inspector,
+.workbench.browsing > .panel-resize {
+  display: none;
+}
+.workbench.browsing > .sidebar {
+  grid-column: 1;
+  grid-row: 1;
+}
+.browse-error {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  color: #ffb4a6;
+  z-index: 50;
+}
+
+.workbench.browsing.focus-mode > .session-browser {
+  grid-column: 1 / -1;
+}
+@media (max-width: 1300px) {
+  .workbench.browsing.preview-open > .session-browser {
+    grid-column: 1 / -1;
+  }
+}

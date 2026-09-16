@@ -64,3 +64,12 @@ flowchart LR
 协议依据：[Grok 扩展通知定义](https://github.com/xai-org/grok-build/blob/main/crates/codegen/xai-grok-shell/src/extensions/notification.rs)。本机真实测试确认子任务通知使用 `_x.ai/session_notification`；正文使用带独立 `sessionId` 的 `session/update`。
 
 本说明描述当前实现，不代表已支持多会话并行或跨平台验证。
+
+
+## 执行会话与浏览会话
+
+主页面持有唯一的执行连接、转录、权限交互和消息队列。执行中导航仅修改 `browsing`；`SessionBrowser` 展示目标会话并维护其独立草稿，不触发连接切换。执行结束后显式继续目标会话，才进行保存、断开和加载。
+
+草稿写入与完整保存共用 `saveQueue`。浏览历史草稿只更新目标记录的 `draft` / `draftImages`，保留正文、归档状态和时间；新会话草稿另存文字、图片及目录。运行中重命名从内存执行状态保存，避免磁盘旧转录覆盖新输出。
+
+回归场景：A 流式输出且队列中有待执行需求 → 浏览 B 并输入草稿 → 新建草稿 → 返回 A → 重命名 A、归档 B → A 完成后继续 B。分别核对连接连续性、队列归属、草稿和最终输出。
