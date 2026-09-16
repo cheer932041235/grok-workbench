@@ -1,6 +1,6 @@
 <script lang="ts">
   import { tick } from "svelte";
-  import { invoke } from "@tauri-apps/api/core";
+  import { convertFileSrc, invoke } from "@tauri-apps/api/core";
   import { hljs } from "$lib/utils/hljs-init";
   import { escapeHtml } from "$lib/utils/ansi";
   import RichText from "./RichText.svelte";
@@ -61,6 +61,7 @@
       ? hljs.highlight(data.content, { language }).value
       : escapeHtml(data?.content ?? ""),
   );
+  const mediaSrc = $derived(data ? convertFileSrc(data.path) : "");
   let imageSrc = $state("");
   $effect(() => {
     if (!data?.bytes) {
@@ -153,6 +154,23 @@
     {#if loading}<p role="status">正在读取文件…</p>
     {:else if error}<p role="alert">{error}</p>
     {:else if data?.kind === "image"}<img src={imageSrc} alt={data.name} style:width={`${zoom}%`} />
+    {:else if data?.kind === "pdf"}
+      <iframe class="pdf-preview" src={mediaSrc} title={data.name}></iframe>
+    {:else if data?.kind === "video"}
+      <!-- svelte-ignore a11y_media_has_caption -->
+      <video
+        controls
+        preload="metadata"
+        src={mediaSrc}
+        onerror={() => (notice = "此视频编码无法内置播放，可使用系统打开。")}
+      ></video>
+    {:else if data?.kind === "audio"}
+      <audio
+        controls
+        preload="metadata"
+        src={mediaSrc}
+        onerror={() => (notice = "此音频编码无法内置播放，可使用系统打开。")}
+      ></audio>
     {:else if data?.kind === "text"}
       {#if largeText}<p>内容较多，使用纯文本视图。</p>
         <pre>{data.content}</pre>
@@ -250,6 +268,17 @@
     max-width: none;
     height: auto;
     display: block;
+  }
+  .pdf-preview {
+    width: 100%;
+    height: 100%;
+    min-height: 400px;
+    border: 0;
+  }
+  video,
+  audio {
+    width: 100%;
+    max-height: 100%;
   }
   .source {
     display: flex;

@@ -8,7 +8,10 @@ import { parseFileLink } from "../../grok/file-links";
 import "katex/dist/katex.min.css";
 import "highlight.js/styles/github-dark.min.css";
 
+import { filePathMarkdown } from "../../grok/file-path-markdown";
+
 const marked = new Marked();
+marked.use(filePathMarkdown);
 marked.use({ extensions: mathExtensions });
 
 marked.use({

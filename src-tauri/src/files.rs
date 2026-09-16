@@ -4,6 +4,7 @@ use std::{
     io::Read,
     path::{Path, PathBuf},
 };
+use tauri::Manager;
 
 fn resolve(path: &str, cwd: &str) -> Result<PathBuf, String> {
     if path.starts_with("\\\\") || path.starts_with("//") {
@@ -90,6 +91,16 @@ fn preview(path: &str, cwd: &str) -> Result<Value, String> {
         .unwrap_or(&path.to_string_lossy())
         .to_string();
     let mut result = json!({"path":display_path,"name":path.file_name().unwrap_or_default().to_string_lossy(),"extension":ext,"size":metadata.len(),"kind":"unsupported"});
+    let media = match ext.as_str() {
+        "pdf" => Some("pdf"),
+        "mp4" | "webm" | "mov" | "m4v" => Some("video"),
+        "mp3" | "wav" | "ogg" => Some("audio"),
+        _ => None,
+    };
+    if let Some(kind) = media {
+        result["kind"] = json!(kind);
+        return Ok(result);
+    }
     if mime.is_none() && !text {
         return Ok(result);
     }
@@ -124,10 +135,20 @@ fn preview(path: &str, cwd: &str) -> Result<Value, String> {
 }
 
 #[tauri::command]
-pub async fn grok_preview_file(path: String, cwd: String) -> Result<Value, String> {
-    tauri::async_runtime::spawn_blocking(move || preview(&path, &cwd))
+pub async fn grok_preview_file(
+    app: tauri::AppHandle,
+    path: String,
+    cwd: String,
+) -> Result<Value, String> {
+    let value = tauri::async_runtime::spawn_blocking(move || preview(&path, &cwd))
         .await
-        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())??;
+    if matches!(value["kind"].as_str(), Some("pdf" | "video" | "audio")) {
+        app.asset_protocol_scope()
+            .allow_file(value["path"].as_str().ok_or("文件路径缺失")?)
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(value)
 }
 
 #[tauri::command]
@@ -147,7 +168,15 @@ pub async fn grok_open_file(path: String, cwd: String, folder: bool) -> Result<(
                 .unwrap_or("")
                 .to_lowercase()
                 .as_str(),
-            "md" | "txt"
+            "mp4"
+                | "webm"
+                | "mov"
+                | "m4v"
+                | "mp3"
+                | "wav"
+                | "ogg"
+                | "md"
+                | "txt"
                 | "pdf"
                 | "png"
                 | "jpg"
@@ -205,6 +234,16 @@ mod tests {
             preview("large.txt", root.to_str().unwrap()).unwrap()["kind"],
             "unsupported"
         );
+        for (name, kind) in [
+            ("中文 报告.pdf", "pdf"),
+            ("video.mp4", "video"),
+            ("sound.wav", "audio"),
+        ] {
+            fs::write(root.join(name), [0, 1, 2]).unwrap();
+            let value = preview(name, root.to_str().unwrap()).unwrap();
+            assert_eq!(value["kind"], kind);
+            assert!(value.get("bytes").is_none()); // Media is served on demand, not copied through IPC.
+        }
         fs::remove_dir_all(root).unwrap();
     }
 }

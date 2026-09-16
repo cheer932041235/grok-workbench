@@ -1512,3 +1512,13 @@ main > .compact-toolbar {
   font-size: 12px;
   padding: 4px 6px;
 }
+
+.rich-text a[data-local-file] {
+  color: #b9cfab;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.rich-text a[data-local-file] code {
+  color: inherit;
+}

@@ -1,6 +1,6 @@
 [package]
 name = "grok-workbench"
-version = "0.2.6"
+version = "0.2.7"
 edition = "2021"
 description = "Desktop visual workspace for Grok Build"
 license = "Apache-2.0"
@@ -14,7 +14,7 @@ name = "GrokWorkbench"
 path = "src/main.rs"
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["protocol-asset"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-single-instance = "2"
 serde_json = "1"

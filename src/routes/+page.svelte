@@ -1096,7 +1096,7 @@
         </p>{/if}
     </div>
     <div class="sidebar-bottom">
-      <div class="local-label"><i></i> 本地工作台 <span>v0.2.6</span></div>
+      <div class="local-label"><i></i> 本地工作台 <span>v0.2.7</span></div>
       <button onclick={() => (settings = !settings)}>⚙ <span>连接与显示设置</span></button>
     </div>
   </aside>
