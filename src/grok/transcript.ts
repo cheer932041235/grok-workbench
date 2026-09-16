@@ -15,6 +15,36 @@ export function finishTools(transcript: Transcript): Transcript {
 export function exportMarkdown(record: SessionRecord): string {
   return (
     `# ${record.title}\n\n项目：${record.cwd}\n\n` +
+    (record.plan.length
+      ? `## 本轮执行计划
+
+${record.plan.map((step) => `- [${step.status}] ${step.content}`).join("\n")}
+
+`
+      : "") +
+    (record.activity ?? [])
+      .map(
+        (item) => `## ${item.label}
+
+${item.detail}
+
+`,
+      )
+      .join("") +
+    (record.backgroundTasks?.length
+      ? `## 后台任务
+
+${JSON.stringify(record.backgroundTasks, null, 2)}
+
+`
+      : "") +
+    (record.researchContext
+      ? `## 本轮附加研究上下文
+
+${record.researchContext}
+
+`
+      : "") +
     record.blocks
       .map((block) => {
         if (block.type !== "tool")

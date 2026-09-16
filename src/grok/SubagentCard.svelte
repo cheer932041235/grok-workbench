@@ -70,7 +70,10 @@
       </ul>{/if}
     {#each agent.transcript.blocks as block}
       {#if block.type === "tool"}<ToolCard tool={block.tool} />
-      {:else if block.type === "thought"}<ThoughtBlock text={block.text} />
+      {:else if block.type === "thought"}<ThoughtBlock
+          text={block.text}
+          durationMs={block.durationMs}
+        />
       {:else}<RichText text={block.text} />{/if}
     {/each}
     {#if agent.output}<h4>任务结果</h4>

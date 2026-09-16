@@ -22,6 +22,22 @@ export function applySessionEvent(
   const childIndex = children.findIndex((child) => child.id === source);
   if (source !== rootId && childIndex < 0) return state;
   const kind = update.sessionUpdate;
+  if (source === rootId && kind === "background_tasks" && Array.isArray(update.tasks))
+    return { ...state, backgroundTasks: update.tasks };
+  if (source === rootId && kind === "hook_execution") {
+    const runs = Array.isArray(update.runs) ? update.runs : [];
+    return {
+      ...state,
+      activity: [
+        ...(state.activity ?? []),
+        {
+          label: "会话自动操作",
+          detail: JSON.stringify(update, null, 2),
+          failed: runs.some((run) => ["failed", "failure", "error"].includes(run.status?.status)),
+        },
+      ],
+    };
+  }
   if (["subagent_spawned", "subagent_progress", "subagent_finished"].includes(String(kind))) {
     const id = update.child_session_id;
     if (typeof id !== "string") return state;
@@ -64,7 +80,23 @@ export function applySessionEvent(
     return { ...state, subagents };
   }
   if (kind === "user_message_chunk") return state;
-  return applyUpdate(state, update);
+  const next = applyUpdate(state, update);
+  const meta = message.params?._meta as Record<string, unknown> | undefined;
+  if (
+    kind === "agent_thought_chunk" &&
+    next !== state &&
+    typeof meta?.agentTimestampMs === "number" &&
+    typeof meta.streamStartMs === "number"
+  ) {
+    const elapsed = meta.agentTimestampMs - meta.streamStartMs;
+    const blocks = [...next.blocks];
+    const last = blocks.at(-1);
+    if (last?.type === "thought" && elapsed >= 0) {
+      blocks[blocks.length - 1] = { ...last, durationMs: elapsed };
+      return { ...next, blocks };
+    }
+  }
+  return next;
 }
 
 export function restoreSubagents(state: Transcript): Transcript {

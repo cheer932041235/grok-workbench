@@ -1,4 +1,8 @@
 <script lang="ts">
+  import ThoughtBlock from "./ThoughtBlock.svelte";
+  import ToolCard from "./ToolCard.svelte";
+  import SubagentCard from "./SubagentCard.svelte";
+  import SessionDetails from "./SessionDetails.svelte";
   import RichText from "./RichText.svelte";
   import { imageUrl, readImage } from "./images";
   import type { StoredSession } from "./history";
@@ -58,6 +62,8 @@
     {running ? `后台会话：${executionStatus}` : "后台任务已结束，可以继续此会话"}
   </div>
   <div class="browse-content">
+    <SessionDetails transcript={record} />
+    {#each record.subagents ?? [] as agent}<SubagentCard {agent} />{/each}
     {#each record.blocks as block}
       {#if block.type === "user"}<article class="user-message">
           <small>你的问题</small>
@@ -66,7 +72,10 @@
         </article>
       {:else if block.type === "answer"}<article>
           <RichText text={block.text} base={record.cwd} />
-        </article>{/if}
+        </article>{:else if block.type === "thought"}<ThoughtBlock
+          text={block.text}
+          durationMs={block.durationMs}
+        />{:else if block.type === "tool"}<ToolCard tool={block.tool} />{/if}
     {/each}
     {#if !record.blocks.length}<p>可以先准备下一条需求。草稿会单独保存。</p>{/if}
   </div>

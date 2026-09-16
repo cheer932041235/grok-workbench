@@ -50,10 +50,12 @@
   } from "../grok/history";
   import { SessionSaver } from "../grok/persistence";
   import { applySessionEvent, restoreSubagents, sessionMethods } from "../grok/session-events";
+  import SessionDetails from "../grok/SessionDetails.svelte";
+  import { visibleBlock } from "../grok/display-policy";
   import ThoughtBlock from "../grok/ThoughtBlock.svelte";
   import PanelResize from "../grok/PanelResize.svelte";
   import InteractionCard from "../grok/InteractionCard.svelte";
-  import type { Interaction, Question } from "../grok/interactions";
+  import { interactionSummary, type Interaction, type Question } from "../grok/interactions";
 
   let windowWidth = $state(1280);
   let leftWidth = $state(252);
@@ -133,7 +135,7 @@
   let error = $state("");
   let settings = $state(false);
   let search = $state("");
-  let filter = $state("answers");
+  let filter = $state("all");
   let fontSize = $state(15);
   let lineHeight = $state(1.85);
   let focusMode = $state(false);
@@ -218,7 +220,7 @@
     readingEarlier = true;
     follow = false;
     outlinePopup = false;
-    if (filter === "tools") filter = "answers";
+    if (filter === "tools") filter = "all";
     await tick();
     if (selectedSession !== sessionId) return;
     const anchor = viewport?.querySelector<HTMLElement>(`[data-question-index="${index}"]`);
@@ -252,13 +254,7 @@
   let visibleBlocks = $derived(
     transcript.blocks
       .map((block, blockIndex) => ({ block, blockIndex }))
-      .filter(
-        ({ block }) =>
-          filter === "all" ||
-          (filter === "answers"
-            ? block.type === "answer" || block.type === "user"
-            : block.type === "tool"),
-      ),
+      .filter(({ block }) => visibleBlock(block, filter)),
   );
   let visibleHistory = $derived(
     history.filter(
@@ -688,7 +684,7 @@
       status = "未连接";
       error = "";
       notice = "";
-      filter = "answers";
+      filter = "all";
       await persist();
     } finally {
       switching = false;
@@ -727,7 +723,13 @@
       projectPath = cwd;
       title = saved.title;
       transcript = JSON.parse(
-        JSON.stringify({ blocks: saved.blocks, plan: saved.plan, subagents: saved.subagents }),
+        JSON.stringify({
+          blocks: saved.blocks,
+          plan: saved.plan,
+          subagents: saved.subagents,
+          activity: saved.activity,
+          backgroundTasks: saved.backgroundTasks,
+        }),
       ) as Transcript;
       transcript = restoreSubagents(finishTools(transcript));
       messageQueue.restore(saved.queuedPrompts ?? []);
@@ -952,7 +954,18 @@
   }
   async function respondInteraction(interaction: Interaction, result: Record<string, unknown>) {
     await client.send({ id: interaction.id, result });
+    transcript = {
+      ...transcript,
+      activity: [
+        ...(transcript.activity ?? []),
+        {
+          label: interaction.kind === "question" ? "已回答 Grok 的问题" : "已处理计划确认",
+          detail: interactionSummary(interaction, result),
+        },
+      ],
+    };
     interactions = interactions.filter((item) => item.id !== interaction.id);
+    await persist();
     status = interactions.length
       ? "等待你的回应"
       : permissions.length
@@ -1110,7 +1123,13 @@
         prompt = active.draft ?? "";
         draftImages = [...(active.draftImages ?? [])];
         transcript = restoreSubagents(
-          finishTools({ blocks: active.blocks, plan: active.plan, subagents: active.subagents }),
+          finishTools({
+            blocks: active.blocks,
+            plan: active.plan,
+            subagents: active.subagents,
+            activity: active.activity,
+            backgroundTasks: active.backgroundTasks,
+          }),
         );
         messageQueue.restore(active.queuedPrompts ?? []);
         status = "历史会话 · 可继续";
@@ -1263,7 +1282,7 @@
         </p>{/if}
     </div>
     <div class="sidebar-bottom">
-      <div class="local-label"><i></i> 本地工作台 <span>v0.2.10</span></div>
+      <div class="local-label"><i></i> 本地工作台 <span>v0.2.11</span></div>
       <button onclick={() => (settings = !settings)}>⚙ <span>连接与显示设置</span></button>
     </div>
   </aside>
@@ -1390,16 +1409,18 @@
       </div>{/if}
     <div class="conversation" bind:this={viewport} onscroll={conversationScrolled}>
       <div class="reading-column">
-        {#if filter !== "answers"}{#each transcript.subagents ?? [] as agent (agent.id)}<SubagentCard
-              {agent}
-              canManage={ready &&
-                !connecting &&
-                !switching &&
-                !closing &&
-                !managing &&
-                !configChanging}
-              manage={(action) => manageSubagent(agent.id, action)}
-            />{/each}{/if}
+        <SessionDetails
+          {transcript}
+        />{#each transcript.subagents ?? [] as agent (agent.id)}<SubagentCard
+            {agent}
+            canManage={ready &&
+              !connecting &&
+              !switching &&
+              !closing &&
+              !managing &&
+              !configChanging}
+            manage={(action) => manageSubagent(agent.id, action)}
+          />{/each}
         {#key sessionId + ":" + filter}
           {#each visibleBlocks as { block, blockIndex } (blockIndex)}
             {#if block.type === "user"}<article
@@ -1429,7 +1450,11 @@
                 </div>
                 <RichText text={block.text} />
               </article>
-            {:else if block.type === "thought"}<ThoughtBlock text={block.text} />
+            {:else if block.type === "thought"}<ThoughtBlock
+                text={block.text}
+                durationMs={block.durationMs}
+                active={busy && blockIndex === transcript.blocks.length - 1}
+              />
             {:else if block.type === "tool"}<ToolCard tool={block.tool} />{/if}
           {/each}
         {/key}

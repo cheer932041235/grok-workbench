@@ -36,9 +36,17 @@ export interface Update extends Partial<Tool> {
 }
 export type Block =
   | { type: "user"; text: string; images?: PromptImage[] }
-  | { type: "answer" | "thought"; text: string }
+  | { type: "answer" | "thought"; text: string; durationMs?: number }
   | { type: "tool"; tool: Tool };
+export interface Activity {
+  label: string;
+  detail: string;
+  failed?: boolean;
+}
 export interface Transcript {
+  activity?: Activity[];
+  backgroundTasks?: unknown[];
+  researchContext?: string;
   blocks: Block[];
   plan: PlanEntry[];
   subagents?: Subagent[];

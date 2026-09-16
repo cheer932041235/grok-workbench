@@ -13,7 +13,7 @@
   });
 </script>
 
-<details class="tool-card" bind:open={expanded}>
+<details class="tool-card" class:compact={!expanded} bind:open={expanded}>
   <summary>
     <span class="tool-icon"
       >{tool.kind === "edit" ? "±" : tool.kind === "execute" ? ">_" : "↗"}</span
@@ -71,3 +71,14 @@
         </p>{/if}
     </div>{/if}
 </details>
+
+<style>
+  .tool-card.compact {
+    background: transparent;
+    border-color: transparent;
+    margin: 3px 0;
+  }
+  .tool-card.compact > summary {
+    padding: 5px 8px;
+  }
+</style>

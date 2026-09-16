@@ -15,6 +15,9 @@ export function historySummary(record: StoredSession): HistorySummary {
 export function materializeHistory(record: StoredSession): StoredSession {
   if (!record.importedEvents) return record;
   let transcript: Transcript = {
+    activity: record.activity,
+    backgroundTasks: record.backgroundTasks,
+    researchContext: record.researchContext,
     blocks: record.blocks,
     plan: record.plan,
     subagents: record.subagents,
