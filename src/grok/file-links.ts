@@ -38,4 +38,4 @@ export function parseFileLink(href: string): FileTarget | undefined {
 }
 
 export const filePreviewContext = Symbol("file-preview");
-export type OpenFile = (target: FileTarget, base?: string) => void;
+export type OpenFile = (target: FileTarget, base?: string, source?: string) => void;

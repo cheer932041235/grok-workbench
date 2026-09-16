@@ -5,7 +5,7 @@ export function previewContext(blocks: Block[]) {
   function read(value: unknown) {
     if (typeof value === "string") {
       for (const match of value.matchAll(
-        /[A-Za-z]:[\\/][^\r\n`"<>|]*|\/(?:Users|home|mnt)\/[^\r\n`"<>|]*/g,
+        /[A-Za-z]:[\\/][^\r\n`"'<>|]*|\/(?:Users|home|mnt)\/[^\r\n`"'<>|]*/g,
       ))
         paths.add(match[0].trim().replace(/[，。；]+$/, ""));
       for (const match of value.matchAll(/\b[a-z][a-z0-9]*(?:-[a-z0-9]+)+\b/g))
@@ -18,6 +18,11 @@ export function previewContext(blocks: Block[]) {
       read(block.tool.locations);
       read(block.tool.rawInput);
       read(block.tool.title);
+      const output = block.tool.rawOutput as
+        | { output_file?: string; current_dir?: string }
+        | undefined;
+      read(output?.output_file);
+      read(output?.current_dir);
     } else read(block.text);
   }
   return { paths: [...paths], skills: [...skills] };

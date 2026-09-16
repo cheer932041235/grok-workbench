@@ -10,19 +10,19 @@
     if (link) {
       event.preventDefault();
       const target = parseFileLink(link.dataset.localFile ?? "");
-      if (target && openFile) openFile(target, base);
+      if (target && openFile) openFile(target, base, text);
       return;
     }
     const target = (event.target as HTMLElement).closest<HTMLButtonElement>(
       "[data-code-copy], [data-math-copy]",
     );
     if (!target) return;
-    const text =
+    const copyText =
       target.getAttribute("data-math-copy") ??
       target.closest(".code-block")?.querySelector("code")?.textContent;
-    if (text != null) {
+    if (copyText != null) {
       try {
-        await navigator.clipboard.writeText(text);
+        await navigator.clipboard.writeText(copyText);
         copied = target.hasAttribute("data-math-copy") ? "公式源码已复制" : "代码已复制";
       } catch {
         copied = "复制失败，请手动选择内容复制";

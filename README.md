@@ -4,9 +4,9 @@
 
 为 Grok Build 设计的桌面工作台。阅读流式回答与公式，带图提问，连续安排需求，再把完成的对话归档。
 
-[**下载 Windows 安装包**](https://github.com/cheer932041235/grok-workbench/releases/download/v0.2.8/GrokWorkbench_0.2.8_x64-setup.exe) · [使用指南](docs/guide.md) · [参与贡献](CONTRIBUTING.md) · [反馈问题](https://github.com/cheer932041235/grok-workbench/issues)
+[**下载 Windows 安装包**](https://github.com/cheer932041235/grok-workbench/releases/download/v0.2.9/GrokWorkbench_0.2.9_x64-setup.exe) · [使用指南](docs/guide.md) · [参与贡献](CONTRIBUTING.md) · [反馈问题](https://github.com/cheer932041235/grok-workbench/issues)
 
-**0.2.8 · 早期预览 · Windows x64**。需要单独安装并登录 Grok Build CLI；已联调版本为 1.0.25。
+**0.2.9 · 早期预览 · Windows x64**。需要单独安装并登录 Grok Build CLI；已联调版本为 1.0.25。
 
 ![Grok Workbench 中的公式与代码阅读界面](docs/images/reading.png)
 
@@ -52,7 +52,7 @@
 ## 三步开始
 
 1. 按 [Grok Build 官方说明](https://github.com/xai-org/grok-build#installing-the-released-binary) 安装 CLI，在终端运行 `grok` 完成登录。
-2. [下载安装包](https://github.com/cheer932041235/grok-workbench/releases/download/v0.2.8/GrokWorkbench_0.2.8_x64-setup.exe)，从开始菜单打开 Grok Workbench。
+2. [下载安装包](https://github.com/cheer932041235/grok-workbench/releases/download/v0.2.9/GrokWorkbench_0.2.9_x64-setup.exe)，从开始菜单打开 Grok Workbench。
 3. 选择项目文件夹，检查授权模式，发送第一条需求。找不到 CLI 时，在设置中填写 `grok.exe` 的完整路径。
 
 安装版不需要 Node.js 或 Rust。系统缺少 WebView2 时，安装程序需要联网获取运行时。
@@ -84,7 +84,7 @@ npm run tauri -- dev
 
 ## 当前状态
 
-已完成 Windows 上的安装启动、真实 Grok 识图、流式公式、排队执行、提问回传、计划批准和历史归档联调。自动测试包含 45 项前端用例和 8 项 Rust 用例；验证范围见 [测试说明](docs/testing.md)。
+已完成 Windows 上的安装启动、真实 Grok 识图、流式公式、排队执行、提问回传、计划批准和历史归档联调。自动测试包含 46 项前端用例和 8 项 Rust 用例；验证范围见 [测试说明](docs/testing.md)。
 
 仍处于早期预览：同时执行一个会话，支持从本机 Grok CLI/TUI 导入已有会话，历史列表按需读取正文；支持子任务过程显示、刷新和取消。暂不支持通用文件附件或 Mermaid，也不提供手动创建/恢复子任务的独立入口。macOS、Linux 暂未提供经过验证的安装包。
 

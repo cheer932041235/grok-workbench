@@ -206,7 +206,8 @@ pub async fn grok_preview_file(
                 roots.push(home.join(folder));
             }
         }
-        let matches = candidates(&path, &cwd, &context.unwrap_or(Value::Null), &roots);
+        let context = context.unwrap_or(Value::Null);
+        let matches = candidates(&path, &cwd, &context, &roots);
         if matches.len() > 1 {
             let names: Vec<String> = matches
                 .iter()
@@ -221,6 +222,11 @@ pub async fn grok_preview_file(
         if let Some(found) = matches.first() {
             preview(found.to_string_lossy().trim_start_matches("\\\\?\\"), &cwd)
         } else {
+            let related: Vec<&str> = context["related"].as_array().into_iter().flatten()
+                .filter_map(Value::as_str).filter(|p| Path::new(p).is_absolute() && Path::new(p).is_file()).collect();
+            if !related.is_empty() {
+                return Ok(json!({"kind":"choices", "path":path, "name":path, "extension":"", "candidates":related, "reason":"此路径的文件已找不到。以下文件来自同一条回答，点击可预览："}));
+            }
             preview(&path, &cwd)
         }
     })

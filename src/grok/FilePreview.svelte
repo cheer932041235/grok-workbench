@@ -17,7 +17,7 @@
     cwd: string;
     onclose: () => void;
     width?: number;
-    context: { paths: string[]; skills: string[] };
+    context: { paths: string[]; skills: string[]; related?: string[] };
   } = $props();
   type Preview = {
     path: string;
@@ -162,7 +162,7 @@
     {#if loading}<p role="status">正在读取文件…</p>
     {:else if error}<p role="alert">{error}</p>
     {:else if data?.kind === "choices"}
-      <p>找到多个匹配文件，请选择要预览的路径：</p>
+      <p>{data.reason ?? "找到多个匹配文件，请选择要预览的路径："}</p>
       {#each data.candidates ?? [] as candidate}<button
           class="candidate"
           onclick={() => (target = { ...target, path: candidate })}>{candidate}</button

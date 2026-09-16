@@ -9,10 +9,17 @@
   let preview = $state<{
     target: FileTarget;
     cwd: string;
-    context: ReturnType<typeof previewContext>;
+    context: ReturnType<typeof previewContext> & { related: string[] };
   }>();
-  setContext<OpenFile>(filePreviewContext, (target, base) => {
-    preview = { target, cwd: base ?? cwd, context: previewContext(transcript.blocks) };
+  setContext<OpenFile>(filePreviewContext, (target, base, source) => {
+    preview = {
+      target,
+      cwd: base ?? cwd,
+      context: {
+        ...previewContext(transcript.blocks),
+        related: previewContext([{ type: "answer", text: source ?? "" }]).paths,
+      },
+    };
   });
   import { invoke, isTauri } from "@tauri-apps/api/core";
   import { open, save } from "@tauri-apps/plugin-dialog";
@@ -1101,7 +1108,7 @@
         </p>{/if}
     </div>
     <div class="sidebar-bottom">
-      <div class="local-label"><i></i> 本地工作台 <span>v0.2.8</span></div>
+      <div class="local-label"><i></i> 本地工作台 <span>v0.2.9</span></div>
       <button onclick={() => (settings = !settings)}>⚙ <span>连接与显示设置</span></button>
     </div>
   </aside>
