@@ -10,7 +10,8 @@ it("keeps failures and interruptions visible in answer-only mode", () => {
   expect(
     visibleBlock({ type: "tool", tool: { toolCallId: "a", status: "completed" } }, "answers"),
   ).toBe(false);
-  expect(visibleBlock({ type: "thought", text: "thinking" }, "all")).toBe(true);
+  for (const filter of ["all", "answers", "tools"])
+    expect(visibleBlock({ type: "thought", text: "thinking" }, filter)).toBe(true);
 });
 it("uses actual timestamps, does not invent elapsed time, and retains it on later deltas", () => {
   let t: Transcript = { blocks: [], plan: [] };

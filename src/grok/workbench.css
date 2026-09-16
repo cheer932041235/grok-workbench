@@ -528,13 +528,11 @@ header {
   color: #a0a79f;
   font-size: 12px;
 }
-.thought > summary {
-  cursor: pointer;
-  list-style: none;
+.thought > header {
   display: flex;
   justify-content: space-between;
 }
-.thought > summary span {
+.thought > header span {
   font-size: 13px;
   color: #69746b;
 }
