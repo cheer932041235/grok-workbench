@@ -4,6 +4,24 @@
   let { transcript }: { transcript: Transcript } = $props();
 </script>
 
+{#each [...(transcript.goal ? [transcript.goal] : []), ...(transcript.workflows ?? [])] as run}
+  <section class="session-detail" aria-label="目标与工作流状态">
+    <strong>{run.sessionUpdate === "goal_updated" ? "自主目标" : "工作流"} · {String(run.status ?? "")}</strong>
+    <p>{String(run.objective ?? run.name ?? "")}</p>
+    <div>
+      阶段：{String(run.phase ?? run.current_phase ?? "—")}{#if typeof run.tokens_used === "number"}
+        · 已用 {run.tokens_used.toLocaleString()} tokens{/if}{#if typeof run.token_budget === "number"}
+        / {run.token_budget.toLocaleString()}{/if}
+    </div>
+    {#if run.last_event}<p>{String(run.last_event)} {String(run.last_event_detail ?? "")}</p>{/if}
+    {#if run.pause_message}<p>{String(run.pause_message)}</p>{/if}
+    {#if run.result_summary}<p>{String(run.result_summary)}</p>{/if}
+    <details>
+      <summary>完整状态</summary>
+      <pre>{JSON.stringify(run, null, 2)}</pre>
+    </details>
+  </section>
+{/each}
 {#if transcript.plan.length}<details class="session-detail" open>
     <summary>本轮执行计划</summary>
     <ul>

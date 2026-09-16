@@ -1,4 +1,50 @@
 <script lang="ts">
+  import CommandMenu from "../grok/CommandMenu.svelte";
+  import {
+    slashCommand,
+    remoteCommand,
+    promptText,
+    localCommands,
+    type SlashCommand,
+  } from "../grok/commands";
+  let commands = $state<SlashCommand[]>([]);
+  let usageRefresh = $state(0);
+  async function localCommand(text: string) {
+    const cmd = slashCommand(text);
+    if (!cmd || !localCommands.some((c) => c.name === cmd.name)) return false;
+    if (cmd.args && cmd.name !== "model") throw Error(`/${cmd.name} 是工作台界面命令，无需参数。`);
+    if (draftImages.length) throw Error("界面命令不接收图片，请先移除附件。");
+    if (["new", "clear"].includes(cmd.name)) {
+      if (executionLocked || queueView.pending.length)
+        throw Error("请先结束当前任务并处理队列，再重置对话。");
+      await fresh();
+      prompt = "";
+      draftImages = [];
+      unsentPrompt = undefined;
+      await persist();
+    } else if (cmd.name === "usage") {
+      usageRefresh++;
+      document.querySelector(".usage-panel")?.scrollIntoView({ block: "nearest" });
+    } else if (cmd.name === "export") await exportChat();
+    else if (cmd.name === "resume") {
+      showArchived = false;
+      notice = "请从左侧历史会话中选择要继续的对话。";
+    } else if (cmd.name === "model") {
+      await connect();
+      const option = options.find(
+        (o) => o.id === "model" || o.name.toLowerCase().includes("model"),
+      );
+      if (!option) throw Error("当前 Grok 未返回可选择的模型。");
+      if (cmd.args) {
+        const value = option.options.find((o) => o.value === cmd.args || o.name === cmd.args);
+        if (!value) throw Error(`可用模型：${option.options.map((o) => o.value).join("、")}`);
+        await changeConfig(option, value.value);
+      } else
+        notice = `当前模型：${option.currentValue}；可选：${option.options.map((o) => o.value).join("、")}`;
+    } else notice = "输入 / 浏览命令，输入名称筛选。连接 Grok 后会加载本会话提供的全部命令和技能。";
+    return true;
+  }
+
   import { onMount, tick, setContext } from "svelte";
   import SessionBrowser from "../grok/SessionBrowser.svelte";
   import UsagePanel from "../grok/UsagePanel.svelte";
@@ -564,11 +610,19 @@
       const update = message.params?.update as Record<string, unknown>;
       if (!update) return;
       if (
+        update.sessionUpdate === "available_commands_update" &&
+        (message.params?.sessionId === sessionId || connecting)
+      )
+        commands = update.availableCommands as SlashCommand[];
+      if (
         message.params?.sessionId === sessionId &&
         update.sessionUpdate === "config_option_update"
       )
         options = update.configOptions as ConfigOption[];
-      if (!replaying) {
+      if (
+        !replaying ||
+        ["goal_updated", "workflow_updated"].includes(String(update.sessionUpdate))
+      ) {
         const next = applySessionEvent(transcript, sessionId, message);
         if (next !== transcript) {
           transcript = next;
@@ -728,6 +782,8 @@
           plan: saved.plan,
           subagents: saved.subagents,
           activity: saved.activity,
+          goal: saved.goal,
+          workflows: saved.workflows,
           backgroundTasks: saved.backgroundTasks,
         }),
       ) as Transcript;
@@ -787,6 +843,7 @@
     connecting = true;
     status = "正在连接 Grok…";
     try {
+      commands = [];
       const init = await client.connect(executable, cwd, permissionMode);
       activePermissionMode = permissionMode;
       canLoad = Boolean((init.agentCapabilities as Record<string, unknown>)?.loadSession);
@@ -829,7 +886,7 @@
       report(e);
     }
   }
-  function send() {
+  async function send() {
     if (
       (!prompt.trim() && !draftImages.length) ||
       imageLoading ||
@@ -842,6 +899,20 @@
     )
       return;
     const text = prompt.trim();
+    if (busy && /^\/goal\s+(pause|clear)\s*$/.test(text)) {
+      error = "请先点击停止，待当前执行结束后发送目标暂停或清除命令。输入已保留。";
+      return;
+    }
+    try {
+      if (await localCommand(text)) {
+        prompt = slashCommand(text)?.name === "help" ? "/" : "";
+        await persist();
+        return;
+      }
+    } catch (e) {
+      report(e);
+      return;
+    }
     const images = [...draftImages];
     draftImages = [];
     archived = false;
@@ -885,12 +956,28 @@
       }
       status = "Grok 正在工作";
       await persist();
+      const requestText = promptText(remoteCommand(text, commands));
       const result = await client.request("session/prompt", {
         sessionId,
-        prompt: [...(text ? [{ type: "text", text }] : []), ...imageContent(images)],
+        prompt: [
+          ...(requestText ? [{ type: "text", text: requestText }] : []),
+          ...imageContent(images),
+        ],
       });
       status = result.stopReason === "cancelled" ? "已停止" : "本轮完成";
       completed = result.stopReason === "end_turn";
+      if (slashCommand(text) && completed) {
+        transcript = {
+          ...transcript,
+          activity: [
+            ...(transcript.activity ?? []),
+            {
+              label: `命令 ${slashCommand(text)!.name}`,
+              detail: "Grok 已完成本次命令处理。目标或工作流是否完成，以其状态为准。",
+            },
+          ],
+        };
+      }
     } catch (e) {
       report(e);
       status = "任务未完成";
@@ -1128,6 +1215,8 @@
             plan: active.plan,
             subagents: active.subagents,
             activity: active.activity,
+            goal: active.goal,
+            workflows: active.workflows,
             backgroundTasks: active.backgroundTasks,
           }),
         );
@@ -1282,7 +1371,7 @@
         </p>{/if}
     </div>
     <div class="sidebar-bottom">
-      <div class="local-label"><i></i> 本地工作台 <span>v0.2.11</span></div>
+      <div class="local-label"><i></i> 本地工作台 <span>v0.2.12</span></div>
       <button onclick={() => (settings = !settings)}>⚙ <span>连接与显示设置</span></button>
     </div>
   </aside>
@@ -1554,7 +1643,16 @@
           {/each}
         </section>
       {/if}
-      <UsagePanel {executable} />
+      <UsagePanel {executable} refreshRequest={usageRefresh} />
+      <CommandMenu
+        text={prompt}
+        {commands}
+        connected={ready}
+        choose={(value) => {
+          prompt = value;
+          inputChanged();
+        }}
+      />
       <div class="composer">
         {#if draftImages.length}<div class="draft-images">
             {#each draftImages as image, index}<div>

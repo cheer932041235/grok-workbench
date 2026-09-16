@@ -44,6 +44,8 @@ export interface Activity {
   failed?: boolean;
 }
 export interface Transcript {
+  goal?: Record<string, unknown>;
+  workflows?: Record<string, unknown>[];
   activity?: Activity[];
   backgroundTasks?: unknown[];
   researchContext?: string;

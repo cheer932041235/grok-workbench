@@ -1,6 +1,7 @@
 <script lang="ts">
   import { parseBilling, type BillingInfo } from "./billing";
-  let { executable }: { executable: string } = $props();
+  let { executable, refreshRequest = 0 }: { executable: string; refreshRequest?: number } =
+    $props();
   let info = $state<BillingInfo>();
   let error = $state("");
   let updated = $state("");
@@ -9,6 +10,7 @@
   $effect(() => {
     const command = executable;
     void refresh;
+    void refreshRequest;
     let disposed = false,
       pending = false;
     info = undefined;

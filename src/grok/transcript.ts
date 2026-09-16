@@ -15,6 +15,10 @@ export function finishTools(transcript: Transcript): Transcript {
 export function exportMarkdown(record: SessionRecord): string {
   return (
     `# ${record.title}\n\n项目：${record.cwd}\n\n` +
+    (record.goal ? `## 自主目标\n\n${JSON.stringify(record.goal, null, 2)}\n\n` : "") +
+    (record.workflows?.length
+      ? `## 工作流\n\n${JSON.stringify(record.workflows, null, 2)}\n\n`
+      : "") +
     (record.plan.length
       ? `## 本轮执行计划
 

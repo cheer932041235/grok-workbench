@@ -22,6 +22,45 @@ export function applySessionEvent(
   const childIndex = children.findIndex((child) => child.id === source);
   if (source !== rootId && childIndex < 0) return state;
   const kind = update.sessionUpdate;
+  const notices: Record<string, string> = {
+    auto_compact_started: "正在压缩上下文",
+    auto_compact_completed: "上下文压缩完成",
+    auto_compact_failed: "上下文压缩失败",
+    auto_compact_cancelled: "上下文压缩取消",
+    memory_files: "会话记忆",
+    memory_flush_completed: "记忆写入完成",
+    memory_dream_started: "记忆整理开始",
+    memory_dream_completed: "记忆整理完成",
+    hooks_changed: "Hooks 已更新",
+    plugins_changed: "插件已更新",
+    plugin_updates_installed: "插件安装完成",
+    scheduled_task_created: "定时任务已创建",
+    scheduled_task_fired: "定时任务已触发",
+    scheduled_task_deleted: "定时任务已删除",
+  };
+  if (source === rootId && notices[String(kind)]) {
+    const label = notices[String(kind)];
+    return {
+      ...state,
+      activity: [
+        ...(state.activity ?? []).filter((a) => kind !== "memory_files" || a.label !== label),
+        {
+          label,
+          detail: JSON.stringify(update, null, 2),
+          failed: String(kind).endsWith("_failed"),
+        },
+      ],
+    };
+  }
+  if (source === rootId && kind === "goal_updated") return { ...state, goal: { ...update } };
+  if (source === rootId && kind === "workflow_updated")
+    return {
+      ...state,
+      workflows: [
+        ...(state.workflows ?? []).filter((w) => w.run_id !== update.run_id),
+        { ...update },
+      ],
+    };
   if (source === rootId && kind === "background_tasks" && Array.isArray(update.tasks))
     return { ...state, backgroundTasks: update.tasks };
   if (source === rootId && kind === "hook_execution") {
