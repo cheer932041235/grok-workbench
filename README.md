@@ -6,7 +6,7 @@
 
 [**下载 Windows 安装包**](https://github.com/cheer932041235/grok-workbench/releases/download/v0.2.10/GrokWorkbench_0.2.10_x64-setup.exe) · [使用指南](docs/guide.md) · [参与贡献](CONTRIBUTING.md) · [反馈问题](https://github.com/cheer932041235/grok-workbench/issues)
 
-**0.2.10 · 早期预览 · Windows x64**。需要单独安装并登录 Grok Build CLI；已联调版本为 1.0.25。
+**当前源码 0.2.13 · 最新公开安装包 0.2.10 · Windows x64**。需要单独安装并登录 Grok Build CLI；已联调版本为 1.0.25。源码版本包含安装包发布后继续完成的修复与界面改进；下载链接仍指向最新公开安装包。
 
 ![Grok Workbench 中的公式与代码阅读界面](docs/images/reading.png)
 
@@ -84,7 +84,7 @@ npm run tauri -- dev
 
 ## 当前状态
 
-已完成 Windows 上的安装启动、真实 Grok 识图、流式公式、排队执行、提问回传、计划批准和历史归档联调。自动测试包含 46 项前端用例和 8 项 Rust 用例；验证范围见 [测试说明](docs/testing.md)。
+已完成 Windows 上的安装启动、真实 Grok 识图、流式公式、排队执行、提问回传、计划批准和历史归档联调。2026-09-20 对 0.2.13 源码复核：19 个前端测试文件中的 53 项用例和 9 项 Rust 用例通过，Svelte 检查无错误或警告，lint 与生产构建通过；验证范围和历史版本记录见 [测试说明](docs/testing.md)。
 
 仍处于早期预览：同时执行一个会话，支持从本机 Grok CLI/TUI 导入已有会话，历史列表按需读取正文；支持子任务过程显示、刷新和取消。暂不支持通用文件附件或 Mermaid，也不提供手动创建/恢复子任务的独立入口。macOS、Linux 暂未提供经过验证的安装包。
 
