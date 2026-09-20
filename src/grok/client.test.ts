@@ -1,4 +1,5 @@
 import { beforeEach, expect, it, vi } from "vitest";
+import packageJson from "../../package.json";
 import { GrokClient } from "./client";
 
 const { invoke } = vi.hoisted(() => ({ invoke: vi.fn() }));
@@ -27,4 +28,16 @@ it("does not initialize a connection that was cancelled while the process was st
     "grok_connect",
     "grok_disconnect",
   ]);
+});
+
+it("initializes with the packaged application version", async () => {
+  vi.mocked(invoke).mockResolvedValue(1);
+  const client = new GrokClient(vi.fn(), vi.fn(), vi.fn());
+  const request = vi.spyOn(client, "request").mockResolvedValue({});
+  await client.connect("grok", "project", "default");
+  expect(request).toHaveBeenCalledWith("initialize", {
+    protocolVersion: 1,
+    clientCapabilities: {},
+    clientInfo: { name: "grok-workbench", version: packageJson.version },
+  });
 });

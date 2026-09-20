@@ -5,6 +5,8 @@ use tokio::{
     process::Command,
 };
 
+pub const CLIENT_VERSION: &str = env!("GROK_WORKBENCH_VERSION");
+
 #[tauri::command]
 pub async fn grok_billing(executable: String) -> Result<Value, String> {
     let mut command = Command::new(executable);
@@ -23,7 +25,7 @@ pub async fn grok_billing(executable: String) -> Result<Value, String> {
     let result = tokio::time::timeout(std::time::Duration::from_secs(30), async {
         let mut lines = BufReader::new(output).lines();
         for (id, method, params) in [
-            (1, "initialize", json!({"protocolVersion":1,"clientCapabilities":{},"clientInfo":{"name":"grok-workbench","version":"0.2.5"}})),
+            (1, "initialize", json!({"protocolVersion":1,"clientCapabilities":{},"clientInfo":{"name":"grok-workbench","version":CLIENT_VERSION}})),
             (2, "_x.ai/billing", json!({})),
         ] {
             let request = json!({"jsonrpc":"2.0","id":id,"method":method,"params":params});
@@ -42,4 +44,20 @@ pub async fn grok_billing(executable: String) -> Result<Value, String> {
     let _ = child.kill().await;
     let _ = child.wait().await;
     result?
+}
+
+#[cfg(test)]
+mod tests {
+    use super::CLIENT_VERSION;
+    use serde_json::Value;
+
+    #[test]
+    fn client_version_matches_package_manifest() {
+        let package: Value = serde_json::from_str(include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../package.json"
+        )))
+        .expect("package.json must be valid JSON");
+        assert_eq!(CLIENT_VERSION, package["version"].as_str().unwrap());
+    }
 }

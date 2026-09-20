@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { APP_VERSION } from "../lib/version";
 import type { RpcMessage } from "./protocol";
 
 export class GrokClient {
@@ -54,7 +55,7 @@ export class GrokClient {
     return this.request("initialize", {
       protocolVersion: 1,
       clientCapabilities: {},
-      clientInfo: { name: "grok-workbench", version: "0.2.3" },
+      clientInfo: { name: "grok-workbench", version: APP_VERSION },
     });
   }
   send(message: RpcMessage) {
