@@ -73,6 +73,7 @@
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import { finishTools, exportMarkdown } from "../grok/transcript";
   import { GrokClient } from "../grok/client";
+  import { APP_VERSION } from "../lib/version";
   import { PromptQueue, type QueueView } from "../grok/queue";
   import {
     type Transcript,
@@ -1371,7 +1372,7 @@
         </p>{/if}
     </div>
     <div class="sidebar-bottom">
-      <div class="local-label"><i></i> 本地工作台 <span>v0.2.12</span></div>
+      <div class="local-label"><i></i> 本地工作台 <span>v{APP_VERSION}</span></div>
       <button onclick={() => (settings = !settings)}>⚙ <span>连接与显示设置</span></button>
     </div>
   </aside>
